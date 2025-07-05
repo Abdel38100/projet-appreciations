@@ -1,44 +1,65 @@
 import os
-from flask import Flask
+from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 
 # Initialisation de l'application Flask
 app = Flask(__name__)
 
 # --- Configuration de la base de données ---
-# Récupère l'URL de la base de données depuis la variable d'environnement
 db_url = os.environ.get("DATABASE_URL")
 if not db_url:
     raise RuntimeError("DATABASE_URL is not set")
-
-# Configure l'application pour utiliser l'URL de la base de données
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace("postgres://", "postgresql://")
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Recommandé pour désactiver des notifications inutiles
-
-# Initialise l'extension SQLAlchemy avec notre application
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- Définition des modèles (nos tables) ---
-# Nous allons définir nos tables ici dans une prochaine étape.
-# Pour l'instant, nous laissons cette partie vide.
+
+class Eleve(db.Model):
+    id = db.Column(db.Integer, primary_key=True) # Identifiant unique
+    prenom = db.Column(db.String(100), nullable=False) # Prénom de l'élève
+    nom = db.Column(db.String(100), nullable=False)   # Nom de famille
+
+    def __repr__(self):
+        return f'<Eleve {self.prenom} {self.nom}>'
+
+# (Nous ajouterons la classe Matiere et Appréciation plus tard pour rester simple)
+
+
+# --- Création des tables dans la base de données ---
+# Cette commande doit être exécutée une seule fois pour créer la structure
+with app.app_context():
+    db.create_all()
+
 
 # --- Définition des pages (routes) ---
+
 @app.route('/')
 def accueil():
-    # Essayons de nous connecter pour vérifier que tout fonctionne
-    try:
-        db.session.execute(db.text('SELECT 1'))
-        status_db = "Connectée avec succès !"
-    except Exception as e:
-        status_db = f"Erreur de connexion : {e}"
+    return redirect(url_for('liste_eleves')) # Redirige vers la page des élèves
 
-    return f"""
-        <h1>Bonjour, Professeur !</h1>
-        <p>L'application d'aide à la génération d'appréciations est en construction.</p>
-        <p><strong>Statut de la base de données :</strong> {status_db}</p>
-    """
+@app.route('/eleves')
+def liste_eleves():
+    # Récupérer tous les élèves de la base de données
+    tous_les_eleves = Eleve.query.order_by(Eleve.nom).all()
+    return render_template('liste_eleves.html', eleves=tous_les_eleves)
 
-# Permet de lancer l'application pour des tests locaux
-# (Note: cela ne fonctionnera plus en local sans configurer la BDD, c'est normal)
+@app.route('/eleve/ajouter', methods=['POST'])
+def ajouter_eleve():
+    # Récupérer les données du formulaire
+    prenom = request.form.get('prenom')
+    nom = request.form.get('nom')
+
+    # Créer un nouvel objet Eleve
+    if prenom and nom:
+        nouvel_eleve = Eleve(prenom=prenom, nom=nom)
+        # Ajouter à la session et sauvegarder en base
+        db.session.add(nouvel_eleve)
+        db.session.commit()
+
+    # Rediriger vers la liste des élèves
+    return redirect(url_for('liste_eleves'))
+
+# (Le reste du fichier ne change pas)
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des Élèves</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2em auto; padding: 0 1em; }
+        h1, h2 { color: #333; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #f4f4f4; margin: 0.5em 0; padding: 0.5em; border-radius: 4px; }
+        form { margin-top: 2em; padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"] { padding: 0.5em; margin-right: 0.5em; }
+        input[type="submit"] { padding: 0.5em 1em; background: #007bff; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h1>Gestion de la Classe</h1>
+
+    <h2>Liste des Élèves</h2>
+    {% if eleves %}
+        <ul>
+        {% for eleve in eleves %}
+            <li>{{ eleve.prenom }} {{ eleve.nom }}</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>Aucun élève n'a été ajouté pour le moment.</p>
+    {% endif %}
+
+    <h2>Ajouter un nouvel élève</h2>
+    <form action="{{ url_for('ajouter_eleve') }}" method="post">
+        <label for="prenom">Prénom :</label>
+        <input type="text" id="prenom" name="prenom" required>
+        <label for="nom">Nom :</label>
+        <input type="text" id="nom" name="nom" required>
+        <input type="submit" value="Ajouter l'élève">
+    </form>
+
+</body>
+</html>
