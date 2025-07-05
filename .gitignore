@@ -1,0 +1,9 @@
+# Environnement virtuel Python
+venv/
+
+# Fichiers de cache de Python
+__pycache__/
+*.pyc
+
+# Fichiers de cache de VS Code
+.vscode/
