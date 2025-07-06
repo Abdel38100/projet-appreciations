@@ -5,24 +5,56 @@
     <title>Résultat de l'Analyse</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        /* Style additionnel pour la page de résultat */
-        .resultat-texte {
-            white-space: pre-wrap; /* Conserve les sauts de ligne et espaces */
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 1em;
-            border-radius: 5px;
-            font-family: monospace; /* Police à chasse fixe pour mieux voir l'alignement */
-        }
+        .resultat-bloc { background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 1em; border-radius: 5px; }
+        .resultat-bloc h2 { margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 0.8em; text-align: left; }
+        th { background-color: #f2f2f2; }
     </style>
 </head>
 <body>
-    <h1>Texte Extrait du Bulletin</h1>
+    <h1>Résultat de l'Analyse</h1>
     <p><a href="{{ url_for('accueil') }}">Retour à l'accueil</a></p>
 
-    <h2>Texte brut :</h2>
-    <div class="resultat-texte">
-        {{ texte }}
-    </div>
+    {% if donnees %}
+        <div class="resultat-bloc">
+            <h2>Élève : {{ donnees.nom_eleve or 'Non trouvé' }}</h2>
+            <p><strong>Moyenne générale :</strong> {{ donnees.moyenne_generale or 'Non trouvée' }}</p>
+        </div>
+
+        <div class="resultat-bloc">
+            <h2>Détail par Matière</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Matière</th>
+                        <th>Moyenne</th>
+                        <th>Appréciation du professeur</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in donnees.appreciations_matieres %}
+                    <tr>
+                        <td>{{ item.matiere }}</td>
+                        <td>{{ item.moyenne }}</td>
+                        <td>{{ item.commentaire }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3">Aucune matière trouvée.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="resultat-bloc">
+            <h2>Appréciation Globale du Conseil de Classe</h2>
+            <p><em>{{ donnees.appreciation_globale or 'Non trouvée' }}</em></p>
+        </div>
+    {% else %}
+        <p>Aucune donnée n'a pu être extraite.</p>
+    {% endif %}
+
 </body>
 </html>

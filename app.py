@@ -1,6 +1,7 @@
 import os
 import pdfplumber
 from flask import Flask, render_template, request, redirect, url_for
+from parser import analyser_texte_bulletin
 
 # --- Initialisation et Configuration ---
 app = Flask(__name__)
@@ -39,24 +40,23 @@ def analyser_bulletin():
         chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
         fichier.save(chemin_fichier)
 
-        # 4. Extraire le texte avec pdfplumber
-        texte_extrait = ""
-        try:
-            with pdfplumber.open(chemin_fichier) as pdf:
-                # On prend uniquement la première page pour ce test
-                premiere_page = pdf.pages[0]
-                texte_extrait = premiere_page.extract_text()
-        except Exception as e:
-            return f"Erreur lors de l'analyse du PDF : {e}"
-        finally:
-            # Nettoyer en supprimant le fichier temporaire
-            if os.path.exists(chemin_fichier):
-                os.remove(chemin_fichier)
-        
-        # 5. Afficher le texte extrait
-        return render_template('resultat.html', texte=texte_extrait)
-    else:
-        return "Erreur : Veuillez téléverser un fichier au format PDF."
+    # 4. Extraire le texte avec pdfplumber
+    texte_extrait = ""
+    try:
+        with pdfplumber.open(chemin_fichier) as pdf:
+            premiere_page = pdf.pages[0]
+            texte_extrait = premiere_page.extract_text() or ""
+    except Exception as e:
+        return f"Erreur lors de l'analyse du PDF : {e}"
+    finally:
+        if os.path.exists(chemin_fichier):
+            os.remove(chemin_fichier)
+    
+    # 5. NOUVEAU : Appeler notre parser pour structurer les données
+    donnees_structurees = analyser_texte_bulletin(texte_extrait)
+    
+    # 6. Afficher les données structurées
+    return render_template('resultat.html', donnees=donnees_structurees)
 
 # (Le reste du fichier, comme 'if __name__ == "__main__"', ne change pas)
 if __name__ == '__main__':
