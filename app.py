@@ -1,14 +1,14 @@
 import os
 import pdfplumber
 from flask import Flask, render_template, request
-from flaskext.markdown import Markdown # <-- NOUVEL IMPORT
+from flask_misaka import Misaka # <-- NOUVEL IMPORT
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
 
 # --- Initialisation et Configuration de l'Application ---
 app = Flask(__name__)
-Markdown(app) # <-- INITIALISATION DE LA LIBRAIRIE MARKDOWN
+Misaka(app) # <-- NOUVELLE INITIALISATION
 
 # Crée un dossier 'uploads' pour stocker temporairement les PDF.
 UPLOAD_FOLDER = 'uploads'
@@ -28,12 +28,13 @@ def accueil():
 @app.route('/analyser', methods=['POST'])
 def analyser_bulletin():
     """Point d'entrée principal qui gère l'analyse du bulletin."""
-    # ... (partie gestion de l'upload identique) ...
+    # Gestion de l'upload
     if 'bulletin_pdf' not in request.files: return "Erreur : Aucun fichier n'a été envoyé."
     fichier = request.files['bulletin_pdf']
     if fichier.filename == '': return "Erreur : Aucun fichier sélectionné."
     if not (fichier and fichier.filename.endswith('.pdf')): return "Erreur : Veuillez téléverser un fichier au format PDF."
 
+    # Extraction du texte
     texte_extrait = ""
     chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
     try:
@@ -47,8 +48,10 @@ def analyser_bulletin():
         if os.path.exists(chemin_fichier):
             os.remove(chemin_fichier)
 
+    # Parsing des données
     donnees_structurees = analyser_texte_bulletin(texte_extrait)
     
+    # Génération de l'appréciation par IA
     appreciation_principale = ""
     justifications = ""
     try:
@@ -62,9 +65,6 @@ def analyser_bulletin():
         
         prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
         
-        # #############################################################
-        # PROMPT UTILISATEUR ENTIÈREMENT REVU POUR UNE RÉPONSE EN 2 PARTIES
-        # #############################################################
         prompt_utilisateur = f"""
         Voici les données de l'élève {donnees_structurees['nom_eleve']}.
         Données brutes :
@@ -97,21 +97,18 @@ def analyser_bulletin():
         chat_response = client.chat(
             model="mistral-large-latest",
             messages=messages,
-            temperature=0.5 # Encore plus factuel
+            temperature=0.5
         )
         
         reponse_complete_ia = chat_response.choices[0].message.content
 
-        # #############################################################
-        # NOUVELLE LOGIQUE : On découpe la réponse de l'IA en 2 parties
-        # #############################################################
         separateur = "--- JUSTIFICATIONS ---"
         if separateur in reponse_complete_ia:
             parties = reponse_complete_ia.split(separateur, 1)
             appreciation_principale = parties[0].strip()
             justifications = parties[1].strip()
         else:
-            appreciation_principale = reponse_complete_ia # Si l'IA n'a pas suivi, on met tout
+            appreciation_principale = reponse_complete_ia
             justifications = "L'IA n'a pas fourni de justifications séparées."
 
     except Exception as e:
