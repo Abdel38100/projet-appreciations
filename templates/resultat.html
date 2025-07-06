@@ -5,11 +5,16 @@
     <title>Résultat de l'Analyse</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        .resultat-bloc { background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 1em; border-radius: 5px; }
+        .resultat-bloc { background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 1.5em; border-radius: 5px; }
         .resultat-bloc h2 { margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
         th, td { border: 1px solid #ddd; padding: 0.8em; text-align: left; }
         th { background-color: #f2f2f2; }
+        textarea { width: 98%; font-size: 1em; padding: 1%; border-radius: 4px; border: 1px solid #ccc; }
+        .justifications { background-color: #f7f7f7; border-left: 4px solid #6c757d; }
+        .justifications h3 { color: #6c757d; }
+        .justifications ul { padding-left: 20px; } /* Style pour les listes dans les justifications */
+        .justifications strong { color: #333; } /* Style pour les titres en gras */
     </style>
 </head>
 <body>
@@ -17,13 +22,25 @@
     <p><a href="{{ url_for('accueil') }}">Retour à l'accueil</a></p>
 
     {% if donnees %}
-        <div class="resultat-bloc">
-            <h2>Élève : {{ donnees.nom_eleve or 'Non trouvé' }}</h2>
-            <p><strong>Moyenne générale :</strong> {{ donnees.moyenne_generale or 'Non trouvée' }}</p>
+        <!-- BLOC DE PROPOSITION D'APPRÉCIATION -->
+        <div class="resultat-bloc" style="background-color: #e6f7ff;">
+            <h2>Proposition d'Appréciation Globale (Générée par IA)</h2>
+            <p>Ce texte est prêt à être copié, collé et ajusté.</p>
+            <textarea name="appreciation_finale" rows="4">{{ appreciation_principale }}</textarea>
         </div>
 
+        <!-- BLOC DES JUSTIFICATIONS -->
+        {% if justifications %}
+        <div class="resultat-bloc justifications">
+            <h2>Détail Analytique (Justifications)</h2>
+            <div>{{ justifications | markdown }}</div>
+        </div>
+        {% endif %}
+
+        <!-- BLOC DU TABLEAU DES DONNÉES EXTRAITES -->
         <div class="resultat-bloc">
-            <h2>Détail par Matière</h2>
+            <h2>Données Extraites du Bulletin pour {{ donnees.nom_eleve or 'Non trouvé' }}</h2>
+            <p><strong>Moyenne générale extraite :</strong> {{ donnees.moyenne_generale or 'Non trouvée' }}</p>
             <table>
                 <thead>
                     <tr>
@@ -39,30 +56,10 @@
                         <td>{{ item.moyenne }}</td>
                         <td>{{ item.commentaire }}</td>
                     </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3">Aucune matière trouvée.</td>
-                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
-        <div class="resultat-bloc">
-            <h2>Appréciation Globale du Conseil de Classe</h2>
-            <p><em>{{ donnees.appreciation_globale or 'Non trouvée' }}</em></p>
-        </div>
-
-        <!-- ############################################################# -->
-        <!-- NOUVEAU BLOC POUR L'APPRÉCIATION GÉNÉRÉE PAR IA           -->
-        <!-- ############################################################# -->
-        {% if appreciation_ia %}
-        <div class="resultat-bloc" style="background-color: #e6f7ff;">
-            <h2>Proposition d'Appréciation Générale (Générée par IA)</h2>
-            <p>Vous pouvez copier-coller et modifier ce texte.</p>
-            <textarea name="appreciation_finale" rows="6" style="width: 98%; font-size: 1em; padding: 1%;">{{ appreciation_ia }}</textarea>
-        </div>
-        {% endif %}
 
     {% else %}
         <p>Aucune donnée n'a pu être extraite.</p>
