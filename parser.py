@@ -50,14 +50,12 @@ def analyser_texte_bulletin(texte):
     if len(blocs) > 1:
         for i in range(1, len(blocs), 2):
             nom_bloc = blocs[i]
-            # Si on a atteint notre terminateur, on arrête de traiter
-            if nom_bloc == terminator:
+            if nom_bloc == "Moyenne générale":
                 break
             
             nom_matiere = nom_bloc
             contenu = blocs[i+1]
             
-            # Nettoyer les noms de professeurs
             contenu = re.sub(r'(M\.|Mme)\s+[A-Z]+', '', contenu)
             
             if "N.Not" in contenu or "non évalué" in contenu:
@@ -73,19 +71,20 @@ def analyser_texte_bulletin(texte):
                 position_fin_moyenne = match_moyenne.end()
                 reste_du_contenu = contenu[position_fin_moyenne:]
                 
-                # #############################################################
-                # NETTOYAGE AMÉLIORÉ : Gère les sous-lignes et les notes
-                # #############################################################
-                # Ce regex supprime les lignes qui commencent par des chiffres/slashs (sous-notes)
-                # ainsi que les chiffres/espaces au tout début.
                 appreciation_brute = re.sub(r'^\s*(\d+/\d+\s+)?[\d\s,./]*', '', reste_du_contenu.strip())
-
                 appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').strip().split())
+
+                # #############################################################
+                # ULTIME NETTOYAGE : Supprimer les résidus de notes
+                # #############################################################
+                # Ce regex supprime les motifs comme "4/4 12,65 6,3518,32" n'importe où dans la chaîne.
+                appreciation_finale = re.sub(r'\s*\d+/\d+\s+[\d,\s.]+\s*', ' ', appreciation_propre).strip()
+
 
                 donnees["appreciations_matieres"].append({
                     "matiere": nom_matiere,
                     "moyenne": moyenne_eleve,
-                    "commentaire": appreciation_propre
+                    "commentaire": appreciation_finale # On utilise la version finale
                 })
             else:
                 donnees["appreciations_matieres"].append({
