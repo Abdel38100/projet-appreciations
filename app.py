@@ -76,20 +76,21 @@ def analyser_bulletin():
         # Construction du prompt (l'instruction pour l'IA)
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         
-        prompt_systeme = "Tu es un professeur principal expérimenté, bienveillant mais juste. Tu dois rédiger une appréciation générale pour un bulletin scolaire."
+        prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale sur un bulletin scolaire. Ton style est synthétique, encourageant et va à l'essentiel."
+        
+        # PROMPT UTILISATEUR AMÉLIORÉ POUR PLUS DE SYNTHÈSE
         prompt_utilisateur = f"""
-        Rédige une appréciation générale pour l'élève {donnees_structurees['nom_eleve']}.
-        Sa moyenne générale est de {donnees_structurees['moyenne_generale']}.
-        
-        Voici le détail des appréciations de ses professeurs :
+        Voici les données de l'élève {donnees_structurees['nom_eleve']} (moyenne générale: {donnees_structurees['moyenne_generale']}):
         {liste_appreciations}
+
+        Instructions pour la rédaction :
+        1.  **Synthétise** les tendances générales sans citer les noms des matières. Au lieu de dire "en histoire, il est sérieux", préfère "montre un grand sérieux dans les matières littéraires" ou "son sérieux est relevé par plusieurs professeurs".
+        2.  **Identifie les qualités principales** de l'élève (ex: sérieux, travailleur, volontaire, bonne participation...).
+        3.  **Identifie les axes de progrès principaux** (ex: l'implication en classe, la régularité du travail...).
+        4.  Rédige un paragraphe de **deux à trois phrases maximum**.
+        5.  Termine par une phrase d'encouragement concise.
         
-        Rédige une synthèse de 3 à 4 phrases qui :
-        1. Donne une vue d'ensemble du trimestre (ex: satisfaisant, correct, contrasté...).
-        2. Met en avant les points positifs récurrents (sérieux, participation, efforts...).
-        3. Mentionne avec bienveillance les points à améliorer s'il y en a.
-        4. Se termine par une phrase d'encouragement.
-        Ne fais pas de liste, écris un paragraphe fluide et cohérent.
+        Rédige maintenant l'appréciation globale.
         """
 
         # Préparation des messages pour l'API (syntaxe pour la version 0.4.2 de la librairie)
@@ -102,7 +103,7 @@ def analyser_bulletin():
         chat_response = client.chat(
             model="mistral-large-latest", # Modèle puissant, bon pour le français
             messages=messages,
-            temperature=0.7 # Un peu de créativité, mais pas trop pour rester factuel
+            temperature=0.6 # Température baissée pour une réponse plus factuelle
         )
         
         appreciation_ia = chat_response.choices[0].message.content
