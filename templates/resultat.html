@@ -16,64 +16,91 @@
         .justifications ul { padding-left: 20px; }
         .justifications strong { color: #333; }
         .separateur-eleve { border: none; border-top: 3px solid #007bff; margin: 4em 0; }
+        .bloc-erreur { background-color: #fff3f3; border-color: #dc3545; }
+        .bloc-erreur h2 { color: #dc3545; }
     </style>
 </head>
 <body>
     <h1>Résultats de l'Analyse</h1>
-    <p><strong>{{ tous_les_resultats | length }} bulletin(s) analysé(s).</strong></p>
+    <p><strong>{{ tous_les_resultats | length }} bulletin(s) traité(s).</strong></p>
     <p><a href="{{ url_for('accueil') }}">Analyser d'autres bulletins</a></p>
 
-    <!-- ================================================ -->
-    <!-- BOUCLE PRINCIPALE SUR TOUS LES RÉSULTATS           -->
-    <!-- ================================================ -->
+    <!-- Boucle principale sur tous les résultats -->
     {% for resultat in tous_les_resultats %}
     
-        <!-- SÉPARATEUR VISUEL ENTRE CHAQUE ÉLÈVE -->
         {% if not loop.first %}
             <hr class="separateur-eleve">
         {% endif %}
 
-        <!-- BLOC 1 : LES DONNÉES EXTRAITES DU BULLETIN       -->
-        <div class="resultat-bloc">
-            <h2>Données Extraites du Bulletin pour <strong>{{ resultat.donnees.nom_eleve or 'Élève non identifié' }}</strong></h2>
-            <p><strong>Moyenne générale extraite :</strong> {{ resultat.donnees.moyenne_generale or 'Non trouvée' }}</p>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Matière</th>
-                        <th>Moyenne</th>
-                        <th>Appréciation du professeur</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in resultat.donnees.appreciations_matieres %}
-                    <tr>
-                        <td>{{ item.matiere }}</td>
-                        <td>{{ item.moyenne }}</td>
-                        <td>{{ item.commentaire }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <!-- ================================================ -->
+        <!-- CAS 1 : IL Y A UNE ERREUR DE VALIDATION OU CRITIQUE -->
+        <!-- ================================================ -->
+        {% if resultat.erreur_validation %}
+            <div class="resultat-bloc bloc-erreur">
+                <h2>Problème d'analyse pour : <strong>{{ resultat.nom_fichier }}</strong></h2>
+                <p style="font-weight: bold;">{{ resultat.erreur_validation }}</p>
+                
+                {% if resultat.donnees %}
+                    <h3>Matières trouvées :</h3>
+                    {% if resultat.donnees.appreciations_matieres %}
+                        <ul>
+                        {% for item in resultat.donnees.appreciations_matieres %}
+                            <li>{{ item.matiere }}</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p>Aucune matière n'a pu être identifiée.</p>
+                    {% endif %}
 
-        <!-- BLOC 2 : LA PROPOSITION D'APPRÉCIATION GLOBALE   -->
-        <div class="resultat-bloc" style="background-color: #e6f7ff;">
-            <h2>Proposition d'Appréciation Globale</h2>
-            <p>Ce texte est prêt à être copié, collé et ajusté.</p>
-            <textarea name="appreciation_finale" rows="4">{{ resultat.appreciation_principale }}</textarea>
-        </div>
+                    <h3>Texte brut du PDF (pour nous aider à déboguer) :</h3>
+                    <textarea rows="15" readonly style="width: 98%; font-family: monospace;">{{ resultat.donnees.texte_brut }}</textarea>
+                {% endif %}
+            </div>
 
-        <!-- BLOC 3 : LES JUSTIFICATIONS DE L'IA              -->
-        {% if resultat.justifications %}
-        <div class="resultat-bloc justifications">
-            <h2>Détail Analytique (Justifications)</h2>
-            <div>{{ resultat.justifications | markdown }}</div>
-        </div>
+        <!-- ================================================ -->
+        <!-- CAS 2 : L'ANALYSE A RÉUSSI                       -->
+        <!-- ================================================ -->
+        {% else %}
+            <!-- BLOC 1 : LES DONNÉES EXTRAITES DU BULLETIN -->
+            <div class="resultat-bloc">
+                <h2>Données Extraites du Bulletin pour <strong>{{ resultat.donnees.nom_eleve or 'Élève non identifié' }}</strong></h2>
+                <p><strong>Moyenne générale extraite :</strong> {{ resultat.donnees.moyenne_generale or 'Non trouvée' }}</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Matière</th>
+                            <th>Moyenne</th>
+                            <th>Appréciation du professeur</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in resultat.donnees.appreciations_matieres %}
+                        <tr>
+                            <td>{{ item.matiere }}</td>
+                            <td>{{ item.moyenne }}</td>
+                            <td>{{ item.commentaire }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- BLOC 2 : LA PROPOSITION D'APPRÉCIATION GLOBALE -->
+            <div class="resultat-bloc" style="background-color: #e6f7ff;">
+                <h2>Proposition d'Appréciation Globale</h2>
+                <p>Ce texte est prêt à être copié, collé et ajusté.</p>
+                <textarea name="appreciation_finale" rows="4">{{ resultat.appreciation_principale }}</textarea>
+            </div>
+
+            <!-- BLOC 3 : LES JUSTIFICATIONS DE L'IA -->
+            {% if resultat.justifications %}
+            <div class="resultat-bloc justifications">
+                <h2>Détail Analytique (Justifications)</h2>
+                <div>{{ resultat.justifications | markdown }}</div>
+            </div>
+            {% endif %}
         {% endif %}
 
-    {% else %}
-        <p>Aucun bulletin n'a pu être analysé. Veuillez vérifier les fichiers envoyés.</p>
     {% endfor %}
 
 </body>
