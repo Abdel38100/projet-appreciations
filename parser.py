@@ -40,19 +40,24 @@ def analyser_texte_bulletin(texte):
     ]
     matieres_pattern = "|".join(re.escape(m) for m in matieres_possibles)
     
-    blocs = re.split(f'({matieres_pattern})', texte)
+    # NOUVELLE LOGIQUE : On ajoute "Moyenne générale" comme un délimiteur de fin
+    terminator = "Moyenne générale"
+    # On crée un pattern qui cherche soit une matière, soit le terminateur
+    split_pattern = f'({matieres_pattern}|{terminator})'
+    
+    blocs = re.split(split_pattern, texte)
     
     if len(blocs) > 1:
         for i in range(1, len(blocs), 2):
-            nom_matiere = blocs[i]
+            nom_bloc = blocs[i]
+            # Si on a atteint notre terminateur, on arrête de traiter
+            if nom_bloc == terminator:
+                break
+            
+            nom_matiere = nom_bloc
             contenu = blocs[i+1]
             
-            # #############################################################
-            # NOUVELLE ÉTAPE DE NETTOYAGE : SUPPRIMER LES NOMS DE PROFESSEURS
-            # #############################################################
-            # Ce regex cherche "M. " ou "Mme " suivi d'un nom en majuscules.
-            # On le supprime du contenu avant toute autre analyse.
-            # Le 'g' à la fin de 're.subg' n'existe pas en python, on utilise re.sub sans flag pour remplacer toutes les occurrences.
+            # Nettoyer les noms de professeurs
             contenu = re.sub(r'(M\.|Mme)\s+[A-Z]+', '', contenu)
             
             if "N.Not" in contenu or "non évalué" in contenu:
@@ -67,7 +72,14 @@ def analyser_texte_bulletin(texte):
                 moyenne_eleve = match_moyenne.group(1).replace(',', '.')
                 position_fin_moyenne = match_moyenne.end()
                 reste_du_contenu = contenu[position_fin_moyenne:]
-                appreciation_brute = re.sub(r'^[\d\s,./]*', '', reste_du_contenu) # J'ai ajouté / dans la liste des caractères à supprimer (pour 5/5)
+                
+                # #############################################################
+                # NETTOYAGE AMÉLIORÉ : Gère les sous-lignes et les notes
+                # #############################################################
+                # Ce regex supprime les lignes qui commencent par des chiffres/slashs (sous-notes)
+                # ainsi que les chiffres/espaces au tout début.
+                appreciation_brute = re.sub(r'^\s*(\d+/\d+\s+)?[\d\s,./]*', '', reste_du_contenu.strip())
+
                 appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').strip().split())
 
                 donnees["appreciations_matieres"].append({
