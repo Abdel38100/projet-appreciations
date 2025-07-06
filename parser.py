@@ -12,18 +12,14 @@ def analyser_texte_bulletin(texte):
         "appreciation_globale": None
     }
 
-    # --- 1. Extraire le nom de l'élève (REGEX CORRIGÉ) ---
-    # On cherche une suite de mots en majuscules (le nom) suivi d'un mot avec une majuscule (le prénom)
-    # juste avant "Né le". C'est plus robuste.
+    # --- 1. Extraire le nom de l'élève ---
     match_nom = re.search(r'([A-Z\s]+[A-Z][a-z]+)\nNé le', texte)
     if match_nom:
         donnees["nom_eleve"] = match_nom.group(1).strip()
     else:
-        # Plan B si le premier regex échoue
         match_nom_alt = re.search(r'Échirolles\s*(.*?)\nNé le', texte, re.DOTALL)
         if match_nom_alt:
             donnees["nom_eleve"] = match_nom_alt.group(1).strip()
-
 
     # --- 2. Extraire la moyenne générale ---
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
@@ -36,8 +32,7 @@ def analyser_texte_bulletin(texte):
         appreciation = match_app_glob.group(1).replace('\n', ' ').strip()
         donnees["appreciation_globale"] = " ".join(appreciation.split())
 
-
-    # --- 4. Extraire les détails des matières (LOGIQUE CORRIGÉE) ---
+    # --- 4. Extraire les détails des matières ---
     matieres_possibles = [
         "ENS. MORAL & CIVIQUE", "HISTOIRE-GEOGRAPHIE", "PHILOSOPHIE", 
         "ITALIEN LV2", "ANGLAIS LV1", "HIST.GEO.GEOPOL.S.P.",
@@ -52,29 +47,27 @@ def analyser_texte_bulletin(texte):
             nom_matiere = blocs[i]
             contenu = blocs[i+1]
             
+            # #############################################################
+            # NOUVELLE ÉTAPE DE NETTOYAGE : SUPPRIMER LES NOMS DE PROFESSEURS
+            # #############################################################
+            # Ce regex cherche "M. " ou "Mme " suivi d'un nom en majuscules.
+            # On le supprime du contenu avant toute autre analyse.
+            # Le 'g' à la fin de 're.subg' n'existe pas en python, on utilise re.sub sans flag pour remplacer toutes les occurrences.
+            contenu = re.sub(r'(M\.|Mme)\s+[A-Z]+', '', contenu)
+            
             if "N.Not" in contenu or "non évalué" in contenu:
                 donnees["appreciations_matieres"].append({
                     "matiere": nom_matiere, "moyenne": "N.Not", "commentaire": "non évalué ce trimestre"
                 })
                 continue
 
-            # NOUVEAU REGEX (plus simple et plus robuste)
-            # On cherche juste la première moyenne (celle de l'élève)
             match_moyenne = re.search(r'(\d{1,2}[,.]\d{2})', contenu)
             
             if match_moyenne:
                 moyenne_eleve = match_moyenne.group(1).replace(',', '.')
-                
-                # Maintenant, on trouve la position de la fin de cette moyenne
                 position_fin_moyenne = match_moyenne.end()
-                
-                # L'appréciation commence après cette position.
-                # On prend le reste de la chaine 'contenu' à partir de là.
                 reste_du_contenu = contenu[position_fin_moyenne:]
-                
-                # On nettoie ce qui reste pour trouver l'appréciation.
-                # On supprime les chiffres et points/virgules du début (les moyennes de la classe)
-                appreciation_brute = re.sub(r'^[\d\s,.]*', '', reste_du_contenu)
+                appreciation_brute = re.sub(r'^[\d\s,./]*', '', reste_du_contenu) # J'ai ajouté / dans la liste des caractères à supprimer (pour 5/5)
                 appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').strip().split())
 
                 donnees["appreciations_matieres"].append({
