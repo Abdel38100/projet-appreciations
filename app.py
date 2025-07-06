@@ -1,13 +1,15 @@
 import os
-from mistralai.client import MistralClient
 import pdfplumber
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
 
-# --- Initialisation et Configuration ---
+# --- Initialisation et Configuration de l'Application ---
 app = Flask(__name__)
 
-# Crée un dossier 'uploads' s'il n'existe pas, pour stocker temporairement les PDF
+# Crée un dossier 'uploads' pour stocker temporairement les PDF.
+# Ce dossier est ignoré par Git grâce au fichier .gitignore.
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -18,61 +20,62 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def accueil():
-    """Page d'accueil avec le formulaire d'upload."""
+    """Affiche la page d'accueil avec le formulaire pour téléverser un fichier."""
     return render_template('accueil.html')
 
 
 @app.route('/analyser', methods=['POST'])
 def analyser_bulletin():
-    """Reçoit le PDF, extrait le texte et l'affiche."""
-    # 1. Vérifier si un fichier a été envoyé
+    """
+    Point d'entrée principal qui gère l'analyse du bulletin.
+    1. Reçoit le fichier PDF.
+    2. L'enregistre temporairement.
+    3. Appelle le parser pour extraire les données structurées.
+    4. Appelle l'API de Mistral pour générer l'appréciation globale.
+    5. Affiche la page de résultats.
+    """
+    # Étape 1 : Gérer la réception du fichier
     if 'bulletin_pdf' not in request.files:
         return "Erreur : Aucun fichier n'a été envoyé."
     
     fichier = request.files['bulletin_pdf']
 
-    # 2. Vérifier si le nom du fichier est vide
     if fichier.filename == '':
         return "Erreur : Aucun fichier sélectionné."
 
-    # 3. Si le fichier est valide et est un PDF
-    if fichier and fichier.filename.endswith('.pdf'):
-        # Sauvegarder le fichier temporairement sur le serveur
-        chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
-        fichier.save(chemin_fichier)
+    if not (fichier and fichier.filename.endswith('.pdf')):
+        return "Erreur : Veuillez téléverser un fichier au format PDF."
 
-    # 4. Extraire le texte avec pdfplumber
+    # Étape 2 : Sauvegarde temporaire et extraction du texte brut
     texte_extrait = ""
+    chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
     try:
+        fichier.save(chemin_fichier)
         with pdfplumber.open(chemin_fichier) as pdf:
             premiere_page = pdf.pages[0]
             texte_extrait = premiere_page.extract_text() or ""
     except Exception as e:
-        return f"Erreur lors de l'analyse du PDF : {e}"
+        return f"Erreur lors de la lecture du fichier PDF : {e}"
     finally:
+        # Nettoyage : on supprime le fichier temporaire après l'avoir lu
         if os.path.exists(chemin_fichier):
             os.remove(chemin_fichier)
-    
-    # 5. NOUVEAU : Appeler notre parser pour structurer les données
-    donnees_structurees = analyser_texte_bulletin(texte_extrait)
 
-    # #############################################################
-    # NOUVELLE PARTIE : APPEL À L'API MISTRAL
-    # #############################################################
+    # Étape 3 : Parser le texte brut pour obtenir des données structurées
+    donnees_structurees = analyser_texte_bulletin(texte_extrait)
+    
+    # Étape 4 : Générer l'appréciation globale avec l'IA Mistral
     appreciation_ia = ""
     try:
-        # 1. On récupère la clé API depuis les variables d'environnement
         api_key = os.environ.get("MISTRAL_API_KEY")
         if not api_key:
-            raise ValueError("La clé MISTRAL_API_KEY n'est pas définie.")
+            raise ValueError("La clé MISTRAL_API_KEY n'est pas définie dans les variables d'environnement de Render.")
 
-        # 2. On initialise le client Mistral
         client = MistralClient(api_key=api_key)
         
-        # 3. On construit le "prompt" (on peut garder le même pour l'instant)
+        # Construction du prompt (l'instruction pour l'IA)
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         
-        # On peut séparer le rôle système du message utilisateur pour plus de clarté
         prompt_systeme = "Tu es un professeur principal expérimenté, bienveillant mais juste. Tu dois rédiger une appréciation générale pour un bulletin scolaire."
         prompt_utilisateur = f"""
         Rédige une appréciation générale pour l'élève {donnees_structurees['nom_eleve']}.
@@ -89,31 +92,28 @@ def analyser_bulletin():
         Ne fais pas de liste, écris un paragraphe fluide et cohérent.
         """
 
-        # 4. On prépare les messages et on appelle l'API
+        # Préparation des messages pour l'API (syntaxe pour la version 0.4.2 de la librairie)
         messages = [
-            {"role": "system", "content": prompt_systeme},
-            {"role": "user", "content": prompt_utilisateur}
+            ChatMessage(role="system", content=prompt_systeme),
+            ChatMessage(role="user", content=prompt_utilisateur)
         ]
 
-        # On utilise un des modèles ouverts et performants de Mistral
+        # Appel à l'API Mistral
         chat_response = client.chat(
-            model="mistral-large-latest", # ou "mistral-small-latest" pour une option moins chère et très rapide
+            model="mistral-large-latest", # Modèle puissant, bon pour le français
             messages=messages,
-            temperature=0.7
+            temperature=0.7 # Un peu de créativité, mais pas trop pour rester factuel
         )
         
-        # 5. On récupère la réponse
         appreciation_ia = chat_response.choices[0].message.content
 
     except Exception as e:
         appreciation_ia = f"Erreur lors de la génération par IA (Mistral) : {e}"
 
-    # On passe les données ET la nouvelle appréciation au template (cette partie ne change pas)
+    # Étape 5 : Afficher la page de résultats avec toutes les données
     return render_template('resultat.html', donnees=donnees_structurees, appreciation_ia=appreciation_ia)
 
-    # 6. Afficher les données structurées
-    return render_template('resultat.html', donnees=donnees_structurees)
 
-# (Le reste du fichier, comme 'if __name__ == "__main__"', ne change pas)
+# Point d'entrée pour lancer l'application en local (pour le développement)
 if __name__ == '__main__':
     app.run(debug=True)
