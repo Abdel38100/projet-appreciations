@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Résultat de l'Analyse</title>
+    <title>Résultats de l'Analyse</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         .resultat-bloc { background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 1.5em; border-radius: 5px; }
@@ -15,19 +15,28 @@
         .justifications h3 { color: #6c757d; }
         .justifications ul { padding-left: 20px; }
         .justifications strong { color: #333; }
+        .separateur-eleve { border: none; border-top: 3px solid #007bff; margin: 4em 0; }
     </style>
 </head>
 <body>
-    <h1>Résultat de l'Analyse</h1>
-    <p><a href="{{ url_for('accueil') }}">Retour à l'accueil</a></p>
+    <h1>Résultats de l'Analyse</h1>
+    <p><strong>{{ tous_les_resultats | length }} bulletin(s) analysé(s).</strong></p>
+    <p><a href="{{ url_for('accueil') }}">Analyser d'autres bulletins</a></p>
 
-    {% if donnees %}
-        <!-- ================================================ -->
+    <!-- ================================================ -->
+    <!-- BOUCLE PRINCIPALE SUR TOUS LES RÉSULTATS           -->
+    <!-- ================================================ -->
+    {% for resultat in tous_les_resultats %}
+    
+        <!-- SÉPARATEUR VISUEL ENTRE CHAQUE ÉLÈVE -->
+        {% if not loop.first %}
+            <hr class="separateur-eleve">
+        {% endif %}
+
         <!-- BLOC 1 : LES DONNÉES EXTRAITES DU BULLETIN       -->
-        <!-- ================================================ -->
         <div class="resultat-bloc">
-            <h2>Données Extraites du Bulletin pour {{ donnees.nom_eleve or 'Non trouvé' }}</h2>
-            <p><strong>Moyenne générale extraite :</strong> {{ donnees.moyenne_generale or 'Non trouvée' }}</p>
+            <h2>Données Extraites du Bulletin pour <strong>{{ resultat.donnees.nom_eleve or 'Élève non identifié' }}</strong></h2>
+            <p><strong>Moyenne générale extraite :</strong> {{ resultat.donnees.moyenne_generale or 'Non trouvée' }}</p>
             <table>
                 <thead>
                     <tr>
@@ -37,7 +46,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in donnees.appreciations_matieres %}
+                    {% for item in resultat.donnees.appreciations_matieres %}
                     <tr>
                         <td>{{ item.matiere }}</td>
                         <td>{{ item.moyenne }}</td>
@@ -48,28 +57,24 @@
             </table>
         </div>
 
-        <!-- ================================================ -->
         <!-- BLOC 2 : LA PROPOSITION D'APPRÉCIATION GLOBALE   -->
-        <!-- ================================================ -->
         <div class="resultat-bloc" style="background-color: #e6f7ff;">
-            <h2>Proposition d'Appréciation Globale (Générée par IA)</h2>
+            <h2>Proposition d'Appréciation Globale</h2>
             <p>Ce texte est prêt à être copié, collé et ajusté.</p>
-            <textarea name="appreciation_finale" rows="4">{{ appreciation_principale }}</textarea>
+            <textarea name="appreciation_finale" rows="4">{{ resultat.appreciation_principale }}</textarea>
         </div>
 
-        <!-- ================================================ -->
         <!-- BLOC 3 : LES JUSTIFICATIONS DE L'IA              -->
-        <!-- ================================================ -->
-        {% if justifications %}
+        {% if resultat.justifications %}
         <div class="resultat-bloc justifications">
             <h2>Détail Analytique (Justifications)</h2>
-            <div>{{ justifications | markdown }}</div>
+            <div>{{ resultat.justifications | markdown }}</div>
         </div>
         {% endif %}
 
     {% else %}
-        <p>Aucune donnée n'a pu être extraite.</p>
-    {% endif %}
+        <p>Aucun bulletin n'a pu être analysé. Veuillez vérifier les fichiers envoyés.</p>
+    {% endfor %}
 
 </body>
 </html>
