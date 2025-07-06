@@ -13,8 +13,8 @@
         textarea { width: 98%; font-size: 1em; padding: 1%; border-radius: 4px; border: 1px solid #ccc; }
         .justifications { background-color: #f7f7f7; border-left: 4px solid #6c757d; }
         .justifications h3 { color: #6c757d; }
-        .justifications ul { padding-left: 20px; } /* Style pour les listes dans les justifications */
-        .justifications strong { color: #333; } /* Style pour les titres en gras */
+        .justifications ul { padding-left: 20px; }
+        .justifications strong { color: #333; }
     </style>
 </head>
 <body>
@@ -22,22 +22,9 @@
     <p><a href="{{ url_for('accueil') }}">Retour à l'accueil</a></p>
 
     {% if donnees %}
-        <!-- BLOC DE PROPOSITION D'APPRÉCIATION -->
-        <div class="resultat-bloc" style="background-color: #e6f7ff;">
-            <h2>Proposition d'Appréciation Globale (Générée par IA)</h2>
-            <p>Ce texte est prêt à être copié, collé et ajusté.</p>
-            <textarea name="appreciation_finale" rows="4">{{ appreciation_principale }}</textarea>
-        </div>
-
-        <!-- BLOC DES JUSTIFICATIONS -->
-        {% if justifications %}
-        <div class="resultat-bloc justifications">
-            <h2>Détail Analytique (Justifications)</h2>
-            <div>{{ justifications | markdown }}</div>
-        </div>
-        {% endif %}
-
-        <!-- BLOC DU TABLEAU DES DONNÉES EXTRAITES -->
+        <!-- ================================================ -->
+        <!-- BLOC 1 : LES DONNÉES EXTRAITES DU BULLETIN       -->
+        <!-- ================================================ -->
         <div class="resultat-bloc">
             <h2>Données Extraites du Bulletin pour {{ donnees.nom_eleve or 'Non trouvé' }}</h2>
             <p><strong>Moyenne générale extraite :</strong> {{ donnees.moyenne_generale or 'Non trouvée' }}</p>
@@ -60,6 +47,25 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- ================================================ -->
+        <!-- BLOC 2 : LA PROPOSITION D'APPRÉCIATION GLOBALE   -->
+        <!-- ================================================ -->
+        <div class="resultat-bloc" style="background-color: #e6f7ff;">
+            <h2>Proposition d'Appréciation Globale (Générée par IA)</h2>
+            <p>Ce texte est prêt à être copié, collé et ajusté.</p>
+            <textarea name="appreciation_finale" rows="4">{{ appreciation_principale }}</textarea>
+        </div>
+
+        <!-- ================================================ -->
+        <!-- BLOC 3 : LES JUSTIFICATIONS DE L'IA              -->
+        <!-- ================================================ -->
+        {% if justifications %}
+        <div class="resultat-bloc justifications">
+            <h2>Détail Analytique (Justifications)</h2>
+            <div>{{ justifications | markdown }}</div>
+        </div>
+        {% endif %}
 
     {% else %}
         <p>Aucune donnée n'a pu être extraite.</p>
