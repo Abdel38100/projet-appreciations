@@ -55,10 +55,10 @@ def analyser_texte_bulletin(texte):
             
             nom_matiere = nom_bloc
             contenu = blocs[i+1]
-            
             contenu = re.sub(r'(M\.|Mme)\s+[A-Z]+', '', contenu)
             
             if "N.Not" in contenu or "non évalué" in contenu:
+                # ... (partie N.Not identique)
                 donnees["appreciations_matieres"].append({
                     "matiere": nom_matiere, "moyenne": "N.Not", "commentaire": "non évalué ce trimestre"
                 })
@@ -75,16 +75,15 @@ def analyser_texte_bulletin(texte):
                 appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').strip().split())
 
                 # #############################################################
-                # ULTIME NETTOYAGE : Supprimer les résidus de notes
+                # ULTIME NETTOYAGE CORRIGÉ : On utilise d* au lieu de d+
                 # #############################################################
-                # Ce regex supprime les motifs comme "4/4 12,65 6,3518,32" n'importe où dans la chaîne.
-                appreciation_finale = re.sub(r'\s*\d+/\d+\s+[\d,\s.]+\s*', ' ', appreciation_propre).strip()
-
+                # Ce regex supprime les motifs comme "4/4 ..." ou "/7 ..."
+                appreciation_finale = re.sub(r'\s*\d*/\d+\s*[\d,\s.]*', ' ', appreciation_propre).strip()
 
                 donnees["appreciations_matieres"].append({
                     "matiere": nom_matiere,
                     "moyenne": moyenne_eleve,
-                    "commentaire": appreciation_finale # On utilise la version finale
+                    "commentaire": appreciation_finale
                 })
             else:
                 donnees["appreciations_matieres"].append({
