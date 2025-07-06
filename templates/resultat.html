@@ -52,6 +52,18 @@
             <h2>Appréciation Globale du Conseil de Classe</h2>
             <p><em>{{ donnees.appreciation_globale or 'Non trouvée' }}</em></p>
         </div>
+
+        <!-- ############################################################# -->
+        <!-- NOUVEAU BLOC POUR L'APPRÉCIATION GÉNÉRÉE PAR IA           -->
+        <!-- ############################################################# -->
+        {% if appreciation_ia %}
+        <div class="resultat-bloc" style="background-color: #e6f7ff;">
+            <h2>Proposition d'Appréciation Générale (Générée par IA)</h2>
+            <p>Vous pouvez copier-coller et modifier ce texte.</p>
+            <textarea name="appreciation_finale" rows="6" style="width: 98%; font-size: 1em; padding: 1%;">{{ appreciation_ia }}</textarea>
+        </div>
+        {% endif %}
+
     {% else %}
         <p>Aucune donnée n'a pu être extraite.</p>
     {% endif %}
