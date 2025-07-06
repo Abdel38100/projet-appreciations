@@ -12,15 +12,32 @@ def analyser_texte_bulletin(texte, matieres_attendues):
         "texte_brut": texte
     }
 
-    # --- EXTRACTION DU NOM (LOGIQUE AMÉLIORÉE) ---
-    # On cherche une ligne qui contient "Bulletin du...".
-    # Puis, on cherche une ligne juste après qui contient un NOM en majuscules suivi d'un Prénom.
-    # [A-Z\s]+ -> un ou plusieurs caractères qui sont soit une majuscule, soit un espace (pour les noms composés)
-    # [A-Z][a-z]+ -> un mot commençant par une majuscule suivi de minuscules (le prénom)
-    match_nom = re.search(r'Bulletin du .*?\n([A-Z\s]+[A-Z][a-z]+)', texte)
-    if match_nom:
-        donnees["nom_eleve"] = match_nom.group(1).strip()
+    # --- EXTRACTION DU NOM (LOGIQUE MULTI-STRATÉGIES) ---
+    nom_trouve = None
+
+    # Stratégie 1 : Chercher entre "Bulletin du..." et "Né le..." (la plus robuste)
+    # Le regex cherche "Bulletin du" suivi de n'importe quoi, un saut de ligne, puis capture le texte
+    # jusqu'à la ligne "Né le...". re.DOTALL permet à '.' de matcher les sauts de ligne.
+    match1 = re.search(r'Bulletin du .*?\n(.*?)\nNé le', texte, re.DOTALL)
+    if match1:
+        # On nettoie le bloc capturé. Souvent, le nom est sur la dernière ligne de ce bloc.
+        bloc_nom = match1.group(1).strip()
+        lignes_nom = bloc_nom.split('\n')
+        # On prend la dernière ligne non vide du bloc
+        for ligne in reversed(lignes_nom):
+            if ligne.strip():
+                nom_trouve = ligne.strip()
+                break
+
+    # Stratégie 2 (Plan B) : Si la première échoue, on cherche un NOM Prénom après "Bulletin du..."
+    if not nom_trouve:
+        # Ce regex est plus flexible sur le numéro du trimestre
+        match2 = re.search(r'Bulletin du (?:Trimestre \d+|\d+er Trimestre)\n([A-Z\s]+[A-Z][a-z]+)', texte)
+        if match2:
+            nom_trouve = match2.group(1).strip()
     
+    donnees["nom_eleve"] = nom_trouve
+
     # --- Extraction des autres métadonnées (ne change pas) ---
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
     if match_moy_gen:
@@ -30,7 +47,7 @@ def analyser_texte_bulletin(texte, matieres_attendues):
     if match_app_glob:
         donnees["appreciation_globale"] = " ".join(match_app_glob.group(1).replace('\n', ' ').split())
 
-    # --- LOGIQUE D'EXTRACTION DES MATIÈRES BASÉE SUR LA LISTE FOURNIE (ne change pas) ---
+    # --- LOGIQUE D'EXTRACTION DES MATIÈRES (ne change pas) ---
     try:
         match_tableau = re.search(r'Appréciations\n(.+?)\nMoyenne générale', texte, re.DOTALL)
         if not match_tableau:
