@@ -1,5 +1,8 @@
 blinker==1.9.0
+cffi==1.17.1
+charset-normalizer==3.4.2
 click==8.2.1
+cryptography==45.0.5
 Flask==3.1.1
 Flask-SQLAlchemy==3.1.1
 greenlet==3.2.3
@@ -8,7 +11,12 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.2
 packaging==25.0
+pdfminer.six==20250506
+pdfplumber==0.11.7
+pillow==11.3.0
 psycopg2-binary==2.9.10
+pycparser==2.22
+pypdfium2==4.30.1
 SQLAlchemy==2.0.41
 typing_extensions==4.14.1
 Werkzeug==3.1.3

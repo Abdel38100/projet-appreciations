@@ -7,3 +7,6 @@ __pycache__/
 
 # Fichiers de cache de VS Code
 .vscode/
+
+# Fichier de cache de VS Code
+uploads/

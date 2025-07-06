@@ -1,65 +1,63 @@
 import os
+import pdfplumber
 from flask import Flask, render_template, request, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
 
-# Initialisation de l'application Flask
+# --- Initialisation et Configuration ---
 app = Flask(__name__)
 
-# --- Configuration de la base de données ---
-db_url = os.environ.get("DATABASE_URL")
-if not db_url:
-    raise RuntimeError("DATABASE_URL is not set")
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url.replace("postgres://", "postgresql://")
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-# --- Définition des modèles (nos tables) ---
-
-class Eleve(db.Model):
-    id = db.Column(db.Integer, primary_key=True) # Identifiant unique
-    prenom = db.Column(db.String(100), nullable=False) # Prénom de l'élève
-    nom = db.Column(db.String(100), nullable=False)   # Nom de famille
-
-    def __repr__(self):
-        return f'<Eleve {self.prenom} {self.nom}>'
-
-# (Nous ajouterons la classe Matiere et Appréciation plus tard pour rester simple)
+# Crée un dossier 'uploads' s'il n'existe pas, pour stocker temporairement les PDF
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
-# --- Création des tables dans la base de données ---
-# Cette commande doit être exécutée une seule fois pour créer la structure
-with app.app_context():
-    db.create_all()
-
-
-# --- Définition des pages (routes) ---
+# --- Définition des Pages (Routes) ---
 
 @app.route('/')
 def accueil():
-    return redirect(url_for('liste_eleves')) # Redirige vers la page des élèves
+    """Page d'accueil avec le formulaire d'upload."""
+    return render_template('accueil.html')
 
-@app.route('/eleves')
-def liste_eleves():
-    # Récupérer tous les élèves de la base de données
-    tous_les_eleves = Eleve.query.order_by(Eleve.nom).all()
-    return render_template('liste_eleves.html', eleves=tous_les_eleves)
 
-@app.route('/eleve/ajouter', methods=['POST'])
-def ajouter_eleve():
-    # Récupérer les données du formulaire
-    prenom = request.form.get('prenom')
-    nom = request.form.get('nom')
+@app.route('/analyser', methods=['POST'])
+def analyser_bulletin():
+    """Reçoit le PDF, extrait le texte et l'affiche."""
+    # 1. Vérifier si un fichier a été envoyé
+    if 'bulletin_pdf' not in request.files:
+        return "Erreur : Aucun fichier n'a été envoyé."
+    
+    fichier = request.files['bulletin_pdf']
 
-    # Créer un nouvel objet Eleve
-    if prenom and nom:
-        nouvel_eleve = Eleve(prenom=prenom, nom=nom)
-        # Ajouter à la session et sauvegarder en base
-        db.session.add(nouvel_eleve)
-        db.session.commit()
+    # 2. Vérifier si le nom du fichier est vide
+    if fichier.filename == '':
+        return "Erreur : Aucun fichier sélectionné."
 
-    # Rediriger vers la liste des élèves
-    return redirect(url_for('liste_eleves'))
+    # 3. Si le fichier est valide et est un PDF
+    if fichier and fichier.filename.endswith('.pdf'):
+        # Sauvegarder le fichier temporairement sur le serveur
+        chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
+        fichier.save(chemin_fichier)
 
-# (Le reste du fichier ne change pas)
+        # 4. Extraire le texte avec pdfplumber
+        texte_extrait = ""
+        try:
+            with pdfplumber.open(chemin_fichier) as pdf:
+                # On prend uniquement la première page pour ce test
+                premiere_page = pdf.pages[0]
+                texte_extrait = premiere_page.extract_text()
+        except Exception as e:
+            return f"Erreur lors de l'analyse du PDF : {e}"
+        finally:
+            # Nettoyer en supprimant le fichier temporaire
+            if os.path.exists(chemin_fichier):
+                os.remove(chemin_fichier)
+        
+        # 5. Afficher le texte extrait
+        return render_template('resultat.html', texte=texte_extrait)
+    else:
+        return "Erreur : Veuillez téléverser un fichier au format PDF."
+
+# (Le reste du fichier, comme 'if __name__ == "__main__"', ne change pas)
 if __name__ == '__main__':
     app.run(debug=True)

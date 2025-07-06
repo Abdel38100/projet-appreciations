@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Résultat de l'Analyse</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Style additionnel pour la page de résultat */
+        .resultat-texte {
+            white-space: pre-wrap; /* Conserve les sauts de ligne et espaces */
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 1em;
+            border-radius: 5px;
+            font-family: monospace; /* Police à chasse fixe pour mieux voir l'alignement */
+        }
+    </style>
+</head>
+<body>
+    <h1>Texte Extrait du Bulletin</h1>
+    <p><a href="{{ url_for('accueil') }}">Retour à l'accueil</a></p>
+
+    <h2>Texte brut :</h2>
+    <div class="resultat-texte">
+        {{ texte }}
+    </div>
+</body>
+</html>
