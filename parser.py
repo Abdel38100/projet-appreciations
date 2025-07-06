@@ -34,48 +34,65 @@ def analyser_texte_bulletin(texte):
         donnees["appreciation_globale"] = " ".join(appreciation.split())
 
 
+# ... (début du fichier parser.py, les extractions de nom, etc. ne changent pas)
+
     # --- 4. Extraire les détails des matières ---
     # C'est la partie la plus complexe. On cherche des blocs qui commencent par une matière en majuscules.
-    # On définit une liste de matières possibles pour les identifier.
     # Cette liste est basée sur votre exemple.
     matieres_possibles = [
         "ENS. MORAL & CIVIQUE", "HISTOIRE-GEOGRAPHIE", "PHILOSOPHIE", 
         "ITALIEN LV2", "ANGLAIS LV1", "HIST.GEO.GEOPOL.S.P.",
         "ENSEIGN.SCIENTIFIQUE", "SC. ECONO.& SOCIALES", "ED.PHYSIQUE & SPORT."
     ]
-    # Création d'un grand pattern regex pour trouver n'importe laquelle de ces matières.
     matieres_pattern = "|".join(re.escape(m) for m in matieres_possibles)
     
-    # On divise le texte en blocs, chaque bloc commençant par une matière.
     blocs = re.split(f'({matieres_pattern})', texte)
     
-    # Le premier bloc est ce qui vient avant la première matière, on l'ignore.
-    # On traite les blocs par paires : (nom_matiere, contenu_matiere)
-    for i in range(1, len(blocs), 2):
-        nom_matiere = blocs[i]
-        contenu = blocs[i+1]
-        
-        # Dans le contenu, on cherche la moyenne (le premier nombre avec une virgule)
-        match_moyenne = re.search(r'(\d{1,2}[,.]\d{1,2})', contenu)
-        moyenne = match_moyenne.group(1).replace(',', '.') if match_moyenne else "N/A"
-        
-        # L'appréciation est tout ce qui vient après la moyenne.
-        # On cherche après les 4 chiffres de la moyenne de la classe (ex: 5,6917,60)
-        match_appreciation = re.search(r'\d{1,2}[,.]\d{2}\s*(.+)', contenu, re.DOTALL)
-        if match_appreciation:
-            appreciation_matiere = match_appreciation.group(1).replace('\n', ' ').strip()
-            appreciation_matiere = " ".join(appreciation_matiere.split())
-        else:
-            # Cas spécial pour "non évalué"
-            if "non évalué" in contenu:
-                appreciation_matiere = "non évalué ce trimestre"
-            else:
-                appreciation_matiere = "Appréciation non trouvée"
+    if len(blocs) > 1:
+        # On ignore le premier bloc (ce qui est avant la première matière)
+        for i in range(1, len(blocs), 2):
+            nom_matiere = blocs[i]
+            contenu = blocs[i+1]
+            
+            # Cas spécial pour les matières non notées
+            if "N.Not" in contenu or "non évalué" in contenu:
+                donnees["appreciations_matieres"].append({
+                    "matiere": nom_matiere,
+                    "moyenne": "N.Not",
+                    "commentaire": "non évalué ce trimestre"
+                })
+                continue # On passe à la matière suivante
 
-        donnees["appreciations_matieres"].append({
-            "matiere": nom_matiere,
-            "moyenne": moyenne,
-            "commentaire": appreciation_matiere
-        })
+            # NOUVEAU REGEX AMÉLIORÉ
+            # Il cherche 3 groupes de nombres (moyennes) suivis par le texte de l'appréciation
+            # \s*   -> zéro ou plusieurs espaces
+            # ([\d,.]+) -> capture un groupe de chiffres, virgules ou points
+            # (.+)  -> capture le reste du texte (l'appréciation)
+            # re.DOTALL permet au . de capturer aussi les sauts de ligne
+            pattern_detail = re.compile(r'([\d,.]+) \s* ([\d,.]+) \s* ([\d,.]+) \s* (.+)', re.DOTALL)
+            match_detail = pattern_detail.search(contenu)
+
+            if match_detail:
+                moyenne_eleve = match_detail.group(1).replace(',', '.')
+                # Les groupes 2 et 3 (moyennes basse/haute) sont capturés mais on ne les utilise pas pour l'instant
+                # moyenne_basse = match_detail.group(2)
+                # moyenne_haute = match_detail.group(3)
+                
+                # On nettoie l'appréciation
+                appreciation_brute = match_detail.group(4)
+                appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').split())
+
+                donnees["appreciations_matieres"].append({
+                    "matiere": nom_matiere,
+                    "moyenne": moyenne_eleve,
+                    "commentaire": appreciation_propre
+                })
+            else:
+                # Si le nouveau regex ne fonctionne pas, on met un message d'erreur
+                donnees["appreciations_matieres"].append({
+                    "matiere": nom_matiere,
+                    "moyenne": "Erreur",
+                    "commentaire": "Impossible de parser cette ligne."
+                })
 
     return donnees
