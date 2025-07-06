@@ -12,16 +12,20 @@ def analyser_texte_bulletin(texte):
         "appreciation_globale": None
     }
 
-    # --- 1. Extraire le nom de l'élève ---
-    # On cherche une ligne qui contient "Né le" et on prend ce qui est juste avant.
-    match_nom = re.search(r'(.+?)\nNé le', texte)
+    # --- 1. Extraire le nom de l'élève (REGEX CORRIGÉ) ---
+    # On cherche une suite de mots en majuscules (le nom) suivi d'un mot avec une majuscule (le prénom)
+    # juste avant "Né le". C'est plus robuste.
+    match_nom = re.search(r'([A-Z\s]+[A-Z][a-z]+)\nNé le', texte)
     if match_nom:
-        # On nettoie un peu le nom pour enlever les retours à la ligne et les espaces en trop
-        nom_brut = match_nom.group(1).split('\n')[-1]
-        donnees["nom_eleve"] = nom_brut.strip()
+        donnees["nom_eleve"] = match_nom.group(1).strip()
+    else:
+        # Plan B si le premier regex échoue
+        match_nom_alt = re.search(r'Échirolles\s*(.*?)\nNé le', texte, re.DOTALL)
+        if match_nom_alt:
+            donnees["nom_eleve"] = match_nom_alt.group(1).strip()
+
 
     # --- 2. Extraire la moyenne générale ---
-    # On cherche le nombre qui suit "Moyenne générale"
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
     if match_moy_gen:
         donnees["moyenne_generale"] = match_moy_gen.group(1).replace(',', '.')
@@ -29,16 +33,11 @@ def analyser_texte_bulletin(texte):
     # --- 3. Extraire l'appréciation globale ---
     match_app_glob = re.search(r'Appréciation globale\s*:\s*(.+?)\nMentions', texte, re.DOTALL)
     if match_app_glob:
-        # On remplace les sauts de ligne par des espaces pour avoir une seule phrase.
         appreciation = match_app_glob.group(1).replace('\n', ' ').strip()
         donnees["appreciation_globale"] = " ".join(appreciation.split())
 
 
-# ... (début du fichier parser.py, les extractions de nom, etc. ne changent pas)
-
-    # --- 4. Extraire les détails des matières ---
-    # C'est la partie la plus complexe. On cherche des blocs qui commencent par une matière en majuscules.
-    # Cette liste est basée sur votre exemple.
+    # --- 4. Extraire les détails des matières (LOGIQUE CORRIGÉE) ---
     matieres_possibles = [
         "ENS. MORAL & CIVIQUE", "HISTOIRE-GEOGRAPHIE", "PHILOSOPHIE", 
         "ITALIEN LV2", "ANGLAIS LV1", "HIST.GEO.GEOPOL.S.P.",
@@ -49,38 +48,34 @@ def analyser_texte_bulletin(texte):
     blocs = re.split(f'({matieres_pattern})', texte)
     
     if len(blocs) > 1:
-        # On ignore le premier bloc (ce qui est avant la première matière)
         for i in range(1, len(blocs), 2):
             nom_matiere = blocs[i]
             contenu = blocs[i+1]
             
-            # Cas spécial pour les matières non notées
             if "N.Not" in contenu or "non évalué" in contenu:
                 donnees["appreciations_matieres"].append({
-                    "matiere": nom_matiere,
-                    "moyenne": "N.Not",
-                    "commentaire": "non évalué ce trimestre"
+                    "matiere": nom_matiere, "moyenne": "N.Not", "commentaire": "non évalué ce trimestre"
                 })
-                continue # On passe à la matière suivante
+                continue
 
-            # NOUVEAU REGEX AMÉLIORÉ
-            # Il cherche 3 groupes de nombres (moyennes) suivis par le texte de l'appréciation
-            # \s*   -> zéro ou plusieurs espaces
-            # ([\d,.]+) -> capture un groupe de chiffres, virgules ou points
-            # (.+)  -> capture le reste du texte (l'appréciation)
-            # re.DOTALL permet au . de capturer aussi les sauts de ligne
-            pattern_detail = re.compile(r'([\d,.]+) \s* ([\d,.]+) \s* ([\d,.]+) \s* (.+)', re.DOTALL)
-            match_detail = pattern_detail.search(contenu)
-
-            if match_detail:
-                moyenne_eleve = match_detail.group(1).replace(',', '.')
-                # Les groupes 2 et 3 (moyennes basse/haute) sont capturés mais on ne les utilise pas pour l'instant
-                # moyenne_basse = match_detail.group(2)
-                # moyenne_haute = match_detail.group(3)
+            # NOUVEAU REGEX (plus simple et plus robuste)
+            # On cherche juste la première moyenne (celle de l'élève)
+            match_moyenne = re.search(r'(\d{1,2}[,.]\d{2})', contenu)
+            
+            if match_moyenne:
+                moyenne_eleve = match_moyenne.group(1).replace(',', '.')
                 
-                # On nettoie l'appréciation
-                appreciation_brute = match_detail.group(4)
-                appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').split())
+                # Maintenant, on trouve la position de la fin de cette moyenne
+                position_fin_moyenne = match_moyenne.end()
+                
+                # L'appréciation commence après cette position.
+                # On prend le reste de la chaine 'contenu' à partir de là.
+                reste_du_contenu = contenu[position_fin_moyenne:]
+                
+                # On nettoie ce qui reste pour trouver l'appréciation.
+                # On supprime les chiffres et points/virgules du début (les moyennes de la classe)
+                appreciation_brute = re.sub(r'^[\d\s,.]*', '', reste_du_contenu)
+                appreciation_propre = " ".join(appreciation_brute.replace('\n', ' ').strip().split())
 
                 donnees["appreciations_matieres"].append({
                     "matiere": nom_matiere,
@@ -88,11 +83,8 @@ def analyser_texte_bulletin(texte):
                     "commentaire": appreciation_propre
                 })
             else:
-                # Si le nouveau regex ne fonctionne pas, on met un message d'erreur
                 donnees["appreciations_matieres"].append({
-                    "matiere": nom_matiere,
-                    "moyenne": "Erreur",
-                    "commentaire": "Impossible de parser cette ligne."
+                    "matiere": nom_matiere, "moyenne": "Erreur", "commentaire": "Moyenne élève non trouvée."
                 })
 
     return donnees
