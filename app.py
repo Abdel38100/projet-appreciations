@@ -1,5 +1,5 @@
 import os
-import openai
+from mistralai.client import MistralClient
 import pdfplumber
 from flask import Flask, render_template, request, redirect, url_for
 from parser import analyser_texte_bulletin
@@ -57,15 +57,22 @@ def analyser_bulletin():
     donnees_structurees = analyser_texte_bulletin(texte_extrait)
 
     # #############################################################
-    # NOUVELLE PARTIE : APPEL À L'API OPENAI
+    # NOUVELLE PARTIE : APPEL À L'API MISTRAL
     # #############################################################
     appreciation_ia = ""
     try:
-        # La librairie OpenAI lit automatiquement la variable d'environnement OPENAI_API_KEY
+        # 1. On récupère la clé API depuis les variables d'environnement
+        api_key = os.environ.get("MISTRAL_API_KEY")
+        if not api_key:
+            raise ValueError("La clé MISTRAL_API_KEY n'est pas définie.")
+
+        # 2. On initialise le client Mistral
+        client = MistralClient(api_key=api_key)
         
-        # 1. On construit le "prompt" (l'instruction pour l'IA)
+        # 3. On construit le "prompt" (on peut garder le même pour l'instant)
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         
+        # On peut séparer le rôle système du message utilisateur pour plus de clarté
         prompt_systeme = "Tu es un professeur principal expérimenté, bienveillant mais juste. Tu dois rédiger une appréciation générale pour un bulletin scolaire."
         prompt_utilisateur = f"""
         Rédige une appréciation générale pour l'élève {donnees_structurees['nom_eleve']}.
@@ -82,25 +89,26 @@ def analyser_bulletin():
         Ne fais pas de liste, écris un paragraphe fluide et cohérent.
         """
 
-        # 2. On appelle l'API
-        response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": prompt_systeme},
-                {"role": "user", "content": prompt_utilisateur}
-            ],
-            temperature=0.7 # Un peu de créativité mais pas trop
+        # 4. On prépare les messages et on appelle l'API
+        messages = [
+            {"role": "system", "content": prompt_systeme},
+            {"role": "user", "content": prompt_utilisateur}
+        ]
+
+        # On utilise un des modèles ouverts et performants de Mistral
+        chat_response = client.chat(
+            model="mistral-large-latest", # ou "mistral-small-latest" pour une option moins chère et très rapide
+            messages=messages,
+            temperature=0.7
         )
         
-        # 3. On récupère la réponse
-        appreciation_ia = response.choices[0].message.content
+        # 5. On récupère la réponse
+        appreciation_ia = chat_response.choices[0].message.content
 
     except Exception as e:
-        # Si l'appel à l'IA échoue, on met un message d'erreur
-        appreciation_ia = f"Erreur lors de la génération par IA : {e}"
+        appreciation_ia = f"Erreur lors de la génération par IA (Mistral) : {e}"
 
-
-    # On passe les données ET la nouvelle appréciation au template
+    # On passe les données ET la nouvelle appréciation au template (cette partie ne change pas)
     return render_template('resultat.html', donnees=donnees_structurees, appreciation_ia=appreciation_ia)
 
     # 6. Afficher les données structurées
