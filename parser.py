@@ -12,12 +12,16 @@ def analyser_texte_bulletin(texte, matieres_attendues):
         "texte_brut": texte
     }
 
-    # --- Extraction des métadonnées (ne change pas) ---
-    match_nom = re.search(r'Bulletin du \d+er Trimestre\n(.*?)\nNé le', texte, re.DOTALL)
+    # --- EXTRACTION DU NOM (LOGIQUE AMÉLIORÉE) ---
+    # On cherche une ligne qui contient "Bulletin du...".
+    # Puis, on cherche une ligne juste après qui contient un NOM en majuscules suivi d'un Prénom.
+    # [A-Z\s]+ -> un ou plusieurs caractères qui sont soit une majuscule, soit un espace (pour les noms composés)
+    # [A-Z][a-z]+ -> un mot commençant par une majuscule suivi de minuscules (le prénom)
+    match_nom = re.search(r'Bulletin du .*?\n([A-Z\s]+[A-Z][a-z]+)', texte)
     if match_nom:
-        nom_candidat = match_nom.group(1).strip()
-        donnees["nom_eleve"] = nom_candidat.split('\n')[-1].strip() if '\n' in nom_candidat else nom_candidat
-
+        donnees["nom_eleve"] = match_nom.group(1).strip()
+    
+    # --- Extraction des autres métadonnées (ne change pas) ---
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
     if match_moy_gen:
         donnees["moyenne_generale"] = match_moy_gen.group(1).replace(',', '.')
@@ -26,29 +30,19 @@ def analyser_texte_bulletin(texte, matieres_attendues):
     if match_app_glob:
         donnees["appreciation_globale"] = " ".join(match_app_glob.group(1).replace('\n', ' ').split())
 
-    # --- NOUVELLE LOGIQUE D'EXTRACTION BASÉE SUR LA LISTE FOURNIE ---
+    # --- LOGIQUE D'EXTRACTION DES MATIÈRES BASÉE SUR LA LISTE FOURNIE (ne change pas) ---
     try:
-        # On isole la section du tableau
         match_tableau = re.search(r'Appréciations\n(.+?)\nMoyenne générale', texte, re.DOTALL)
         if not match_tableau:
-            return donnees # On ne peut rien faire si on ne trouve pas le tableau
+            return donnees
 
         tableau_texte = match_tableau.group(1)
-
-        # On utilise la liste fournie pour créer le pattern de découpage
-        # re.escape est CRUCIAL pour gérer les caractères spéciaux comme les points et les '&'
         matieres_pattern = "|".join(re.escape(m) for m in matieres_attendues)
-        
-        # On découpe le texte du tableau en utilisant les noms des matières comme séparateurs
-        # Le premier élément est ce qui vient avant la première matière, on l'ignore.
-        # Les éléments suivants sont le contenu de chaque matière.
         blocs_contenu = re.split(matieres_pattern, tableau_texte)[1:]
 
         for i, nom_matiere in enumerate(matieres_attendues):
             if i < len(blocs_contenu):
                 contenu = blocs_contenu[i]
-
-                # --- Post-traitement (logique qu'on a déjà perfectionnée) ---
                 commentaire_brut = re.sub(r'(M\.|Mme)\s+[A-ZÀ-ÿ]+', '', contenu).strip()
                 
                 moyenne = "N/A"
