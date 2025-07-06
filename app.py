@@ -1,4 +1,5 @@
 import os
+import re # Import manquant pour la gestion des separateurs
 import pdfplumber
 from flask import Flask, render_template, request
 from flask_misaka import Misaka
@@ -20,10 +21,17 @@ def accueil():
 @app.route('/analyser', methods=['POST'])
 def analyser_bulletin():
     fichiers = request.files.getlist('bulletin_pdf')
-    nb_matieres_attendu = int(request.form.get('nb_matieres', 0))
+    
+    # On récupère la liste des matières depuis le textarea
+    liste_matieres_str = request.form.get('liste_matieres', '')
+    # On la transforme en une vraie liste Python, en nettoyant les espaces et en ignorant les entrées vides
+    matieres_attendues = [m.strip() for m in liste_matieres_str.split(',') if m.strip()]
+    nb_matieres_attendu = len(matieres_attendues)
 
     if not fichiers or all(f.filename == '' for f in fichiers):
         return "Erreur : Aucun fichier sélectionné."
+    if not matieres_attendues:
+        return "Erreur : La liste des matières ne peut pas être vide."
 
     tous_les_resultats = []
 
@@ -32,11 +40,8 @@ def analyser_bulletin():
             continue
 
         resultat_eleve = {
-            "nom_fichier": fichier.filename,
-            "donnees": None,
-            "appreciation_principale": "",
-            "justifications": "",
-            "erreur_validation": None
+            "nom_fichier": fichier.filename, "donnees": None, "appreciation_principale": "",
+            "justifications": "", "erreur_validation": None
         }
 
         try:
@@ -47,13 +52,13 @@ def analyser_bulletin():
                 with pdfplumber.open(chemin_fichier) as pdf:
                     texte_extrait = pdf.pages[0].extract_text() or ""
             finally:
-                if os.path.exists(chemin_fichier):
-                    os.remove(chemin_fichier)
+                if os.path.exists(chemin_fichier): os.remove(chemin_fichier)
 
-            donnees_structurees = analyser_texte_bulletin(texte_extrait)
+            # On passe maintenant la liste des matières au parser
+            donnees_structurees = analyser_texte_bulletin(texte_extrait, matieres_attendues)
             resultat_eleve["donnees"] = donnees_structurees
 
-            # --- NOUVELLE ÉTAPE DE VALIDATION ---
+            # --- Validation ---
             erreurs = []
             if not donnees_structurees.get("nom_eleve"):
                 erreurs.append("Le nom de l'élève n'a pas été trouvé.")
@@ -65,9 +70,9 @@ def analyser_bulletin():
             if erreurs:
                 resultat_eleve["erreur_validation"] = " ".join(erreurs)
                 tous_les_resultats.append(resultat_eleve)
-                continue # On arrête le traitement pour ce fichier et on passe au suivant
+                continue
 
-            # --- Si la validation est réussie, on lance l'IA ---
+            # --- Logique IA (inchangée) ---
             api_key = os.environ.get("MISTRAL_API_KEY")
             if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
             client = MistralClient(api_key=api_key)

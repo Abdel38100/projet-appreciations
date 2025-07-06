@@ -7,20 +7,21 @@
 </head>
 <body>
     <h1>Analyseur de Bulletins Scolaires</h1>
-    <p>Téléversez un ou plusieurs bulletins et indiquez le nombre de matières à analyser.</p>
+    <p>Téléversez les bulletins et fournissez la liste des matières pour garantir une analyse précise.</p>
     
     <form action="{{ url_for('analyser_bulletin') }}" method="post" enctype="multipart/form-data">
-        <div>
-            <label for="bulletin_pdf">Choisir des bulletins PDF :</label><br>
+        <div style="margin-bottom: 2em;">
+            <label for="bulletin_pdf">1. Choisir les bulletins PDF :</label><br>
             <input type="file" id="bulletin_pdf" name="bulletin_pdf" accept=".pdf" required multiple>
             <p><small>Astuce : Maintenez Ctrl (ou Cmd sur Mac) pour sélectionner plusieurs fichiers.</small></p>
         </div>
-        <div style="margin-top: 1em;">
-            <label for="nb_matieres">Nombre total de matières dans les bulletins :</label><br>
-            <input type="number" id="nb_matieres" name="nb_matieres" min="1" required value="11">
+        <div style="margin-bottom: 2em;">
+            <label for="liste_matieres">2. Liste des matières (dans l'ordre du bulletin, séparées par une virgule) :</label><br>
+            <textarea id="liste_matieres" name="liste_matieres" rows="6" style="width: 98%;" required></textarea>
+            <p><small>Exemple : ENS. MORAL & CIVIQUE, HISTOIRE-GEOGRAPHIE, PHILOSOPHIE, ...</small></p>
         </div>
-        <div style="margin-top: 2em;">
-            <input type="submit" value="Analyser les bulletins">
+        <div>
+            <input type="submit" value="Lancer l'Analyse">
         </div>
     </form>
 </body>
