@@ -1,8 +1,8 @@
 import re
 
-def analyser_texte_bulletin(texte, matieres_attendues):
+def analyser_texte_bulletin(texte, nom_eleve_attendu, matieres_attendues):
     """
-    Analyse le texte brut d'un bulletin en se basant sur une liste de matières fournie.
+    Analyse le texte brut en vérifiant la présence du nom attendu et en utilisant la liste de matières fournie.
     """
     donnees = {
         "nom_eleve": None,
@@ -12,33 +12,16 @@ def analyser_texte_bulletin(texte, matieres_attendues):
         "texte_brut": texte
     }
 
-    # --- EXTRACTION DU NOM (LOGIQUE MULTI-STRATÉGIES) ---
-    nom_trouve = None
+    # --- ÉTAPE 1 : VÉRIFICATION DU NOM DE L'ÉLÈVE ---
+    # On cherche simplement si le nom attendu (insensible à la casse) est dans le texte.
+    if re.search(re.escape(nom_eleve_attendu), texte, re.IGNORECASE):
+        donnees["nom_eleve"] = nom_eleve_attendu
+    else:
+        # Si on ne trouve pas le nom, on arrête le parsing pour ce bulletin.
+        # L'erreur sera gérée dans app.py.
+        return donnees
 
-    # Stratégie 1 : Chercher entre "Bulletin du..." et "Né le..." (la plus robuste)
-    # Le regex cherche "Bulletin du" suivi de n'importe quoi, un saut de ligne, puis capture le texte
-    # jusqu'à la ligne "Né le...". re.DOTALL permet à '.' de matcher les sauts de ligne.
-    match1 = re.search(r'Bulletin du .*?\n(.*?)\nNé le', texte, re.DOTALL)
-    if match1:
-        # On nettoie le bloc capturé. Souvent, le nom est sur la dernière ligne de ce bloc.
-        bloc_nom = match1.group(1).strip()
-        lignes_nom = bloc_nom.split('\n')
-        # On prend la dernière ligne non vide du bloc
-        for ligne in reversed(lignes_nom):
-            if ligne.strip():
-                nom_trouve = ligne.strip()
-                break
-
-    # Stratégie 2 (Plan B) : Si la première échoue, on cherche un NOM Prénom après "Bulletin du..."
-    if not nom_trouve:
-        # Ce regex est plus flexible sur le numéro du trimestre
-        match2 = re.search(r'Bulletin du (?:Trimestre \d+|\d+er Trimestre)\n([A-Z\s]+[A-Z][a-z]+)', texte)
-        if match2:
-            nom_trouve = match2.group(1).strip()
-    
-    donnees["nom_eleve"] = nom_trouve
-
-    # --- Extraction des autres métadonnées (ne change pas) ---
+    # --- ÉTAPE 2 : Extraction des autres métadonnées ---
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
     if match_moy_gen:
         donnees["moyenne_generale"] = match_moy_gen.group(1).replace(',', '.')
@@ -47,7 +30,7 @@ def analyser_texte_bulletin(texte, matieres_attendues):
     if match_app_glob:
         donnees["appreciation_globale"] = " ".join(match_app_glob.group(1).replace('\n', ' ').split())
 
-    # --- LOGIQUE D'EXTRACTION DES MATIÈRES (ne change pas) ---
+    # --- ÉTAPE 3 : Extraction des matières (méthode robuste basée sur la liste) ---
     try:
         match_tableau = re.search(r'Appréciations\n(.+?)\nMoyenne générale', texte, re.DOTALL)
         if not match_tableau:
@@ -62,28 +45,21 @@ def analyser_texte_bulletin(texte, matieres_attendues):
                 contenu = blocs_contenu[i]
                 commentaire_brut = re.sub(r'(M\.|Mme)\s+[A-ZÀ-ÿ]+', '', contenu).strip()
                 
-                moyenne = "N/A"
-                commentaire_final = "Données non parsées."
-
+                moyenne, commentaire_final = "N/A", "Données non parsées."
                 if "N.Not" in commentaire_brut or "non évalué" in commentaire_brut:
-                    moyenne = "N.Not"
-                    commentaire_final = "non évalué ce trimestre"
+                    moyenne, commentaire_final = "N.Not", "non évalué ce trimestre"
                 else:
                     match_moyenne = re.search(r'(\d{1,2}[,.]\d{2})', commentaire_brut)
                     if match_moyenne:
                         moyenne = match_moyenne.group(1).replace(',', '.')
-                        position_fin_moyenne = match_moyenne.end()
-                        reste_du_contenu = commentaire_brut[position_fin_moyenne:]
-                        appreciation_nettoyee = re.sub(r'^\s*[\d\s,./]*', '', reste_du_contenu.strip())
-                        commentaire_final = " ".join(re.sub(r'\s*\d*/\d+\s*[\d,\s.]*', ' ', appreciation_nettoyee).strip().split())
+                        reste = commentaire_brut[match_moyenne.end():]
+                        nettoye = re.sub(r'^\s*[\d\s,./]*', '', reste.strip())
+                        commentaire_final = " ".join(re.sub(r'\s*\d*/\d+\s*[\d,\s.]*', ' ', nettoye).strip().split())
 
                 donnees["appreciations_matieres"].append({
-                    "matiere": nom_matiere,
-                    "moyenne": moyenne,
-                    "commentaire": commentaire_final
+                    "matiere": nom_matiere, "moyenne": moyenne, "commentaire": commentaire_final
                 })
-
     except Exception as e:
-        print(f"Erreur majeure de parsing guidé: {e}")
+        print(f"Erreur de parsing des matières pour {nom_eleve_attendu}: {e}")
 
     return donnees
