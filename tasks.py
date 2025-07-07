@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from rq import get_current_job
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Text, DateTime, func
+from sqlalchemy.dialects.postgresql import JSONB
 
 Base = declarative_base()
 
@@ -20,6 +21,7 @@ class Analyse(Base):
     moyenne_generale = Column(String(10))
     appreciation_principale = Column(Text, nullable=False)
     justifications = Column(Text)
+    donnees_brutes = Column(JSONB)
     cree_le = Column(DateTime, server_default=func.now())
 
 def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
@@ -43,31 +45,20 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         client = MistralClient(api_key=api_key)
         
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
-        
         prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
-        
-        # --- PROMPT RESTAURÉ ET AMÉLIORÉ ---
         prompt_utilisateur = f"""
         Voici les données de l'élève {nom_eleve_attendu}.
         Données brutes :
         {liste_appreciations}
-
         Ta réponse doit être en DEUX parties distinctes, séparées par la ligne "--- JUSTIFICATIONS ---".
-
         **Partie 1 : Appréciation Globale**
         Rédige un paragraphe de 2 à 3 phrases pour le bulletin. Ce texte doit être synthétique et fluide. Il doit identifier les tendances de fond (qualités, points d'amélioration) sans citer de matières spécifiques.
-
         **Partie 2 : Justifications**
         Sous le séparateur, justifie chaque idée clé de ta synthèse. Pour chaque idée, cite les extraits BRUTS et EXACTS des commentaires des professeurs qui la prouvent. Utilise le format Markdown suivant :
         - **Idée synthétisée:** [Ex: L'élève montre un grand sérieux.]
           - **Preuves:**
             - **[Nom de la matière]:** "[Citation exacte et brute du commentaire]"
             - **[Autre matière]:** "[Autre citation brute]"
-        
-        - **Idée synthétisée:** [Ex: Des efforts sont à poursuivre sur l'implication.]
-          - **Preuves:**
-            - **[Nom de la matière]:** "[Citation exacte et brute du commentaire]"
-
         Rédige maintenant ta réponse complète.
         """
         
@@ -97,7 +88,8 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
             nom_eleve=nom_eleve_attendu,
             moyenne_generale=donnees_structurees.get("moyenne_generale"),
             appreciation_principale=appreciation_principale,
-            justifications=justifications
+            justifications=justifications,
+            donnees_brutes=donnees_structurees
         )
         session.add(nouvelle_analyse)
         session.commit()
