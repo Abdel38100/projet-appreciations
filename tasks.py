@@ -35,14 +35,9 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         
         donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
         
-        # --- ON SUPPRIME LA VÉRIFICATION QUI POSAIT PROBLÈME ---
-        # if not donnees_structurees.get("nom_eleve"):
-        #    raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
-        
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
             raise ValueError(f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)}).")
 
-        # --- Le reste de la logique (IA, sauvegarde BDD) est identique ---
         api_key = os.environ.get("MISTRAL_API_KEY")
         if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
         client = MistralClient(api_key=api_key)
@@ -50,17 +45,14 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
         prompt_utilisateur = f"""
-        Voici les données de l'élève {donnees_structurees['nom_eleve']}.
+        Voici les données de l'élève {nom_eleve_attendu}.
         Données brutes :
         {liste_appreciations}
         Ta réponse doit être en DEUX parties distinctes, séparées par la ligne "--- JUSTIFICATIONS ---".
         **Partie 1 : Appréciation Globale**
-        Rédige un paragraphe de 2 à 3 phrases pour le bulletin. Ce texte doit être synthétique, fluide et ne doit PAS mentionner la moyenne générale. Il doit identifier les tendances de fond (qualités, points d'amélioration) sans citer de matières spécifiques.
+        Rédige un paragraphe de 2 à 3 phrases pour le bulletin.
         **Partie 2 : Justifications**
-        Sous le séparateur, justifie chaque idée clé de ta synthèse. Pour chaque point, cite les preuves exactes des commentaires des professeurs. Utilise le format suivant :
-        - **Idée synthétisée:** [Ex: L'élève fait preuve de sérieux.]
-        - **Preuves:**
-        - **[Nom de la matière]:** "[Citation exacte du commentaire]"
+        Sous le séparateur, justifie chaque idée clé de ta synthèse.
         Rédige maintenant ta réponse complète.
         """
         messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
@@ -70,9 +62,10 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         separateur = "--- JUSTIFICATIONS ---"
         if separateur in reponse_complete_ia:
             parties = reponse_complete_ia.split(separateur, 1)
-            appreciation_principale = parties[0].strip()
-            justifications = parties[1].strip()
+            appreciation_principale = parties[0].replace("**Partie 1 : Appréciation Globale**", "").strip()
+            justifications = parties[1].replace("**Partie 2 : Justifications**", "").strip()
         else:
+            # Si le séparateur n'est pas trouvé, on met tout dans l'appréciation
             appreciation_principale = reponse_complete_ia
             justifications = "L'IA n'a pas fourni de justifications séparées."
         

@@ -3,7 +3,7 @@ import re
 import pdfplumber
 import unicodedata
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from flask_misaka import Misaka
+from flask_misaka import markdown as MisakaMarkdown # On importe la fonction 'markdown' directement
 import redis
 from rq import Queue
 from tasks import traiter_un_bulletin
@@ -13,7 +13,7 @@ from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
-Misaka(app)
+# La ligne Misaka(app) n'est plus nécessaire car on appelle la fonction directement
 
 def normaliser_chaine(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
@@ -150,7 +150,6 @@ def lancer_analyse():
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
 
-
 @app.route('/suivi/<job_ids>')
 @login_required
 def page_suivi(job_ids):
@@ -172,9 +171,15 @@ def statut_jobs():
             if status == 'finished':
                 analyse_sauvegardee = Analyse.query.get(job_id)
                 if analyse_sauvegardee:
-                    resultat_final = { "status": "succes", "nom_eleve": analyse_sauvegardee.nom_eleve, "appreciation_principale": analyse_sauvegardee.appreciation_principale, "justifications": analyse_sauvegardee.justifications }
+                    resultat_final = { 
+                        "status": "succes", 
+                        "nom_eleve": analyse_sauvegardee.nom_eleve, 
+                        "appreciation_principale": analyse_sauvegardee.appreciation_principale, 
+                        # On convertit le texte Markdown des justifications en HTML ici
+                        "justifications_html": MisakaMarkdown(analyse_sauvegardee.justifications or "")
+                    }
             elif status == 'failed':
-                erreur_msg = job.exc_info.strip().split('\n')[-1] if job.exc_info else "La tâche a échoué sans message."
+                erreur_msg = job.exc_info.strip().split('\n')[-1] if job.exc_info else "La tâche a échoué."
                 resultat_final = {"status": "echec", "erreur": erreur_msg}
             
             if not resultat_final: resultat_final = {}
