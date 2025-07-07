@@ -13,23 +13,23 @@ def analyser_texte_bulletin(texte, nom_eleve_attendu, matieres_attendues):
         "texte_brut": texte
     }
 
-    # --- ÉTAPE 1 : EXTRACTION DU NOM DE L'ÉLÈVE (LOGIQUE MULTI-STRATÉGIES) ---
-    nom_trouve = None
-    # Stratégie 1 : Chercher entre "Bulletin du..." et "Né le..."
-    match1 = re.search(r'Bulletin du .*?\n(.*?)\nNé le', texte, re.DOTALL)
-    if match1:
-        bloc_nom = match1.group(1).strip()
-        lignes_nom = bloc_nom.split('\n')
-        for ligne in reversed(lignes_nom):
-            if ligne.strip():
-                nom_trouve = ligne.strip()
-                break
-    # Stratégie 2 (Plan B)
-    if not nom_trouve:
-        match2 = re.search(r'Bulletin du (?:Trimestre \d+|\d+er Trimestre)\n([A-Z\s]+[A-Z][a-z]+)', texte)
-        if match2:
-            nom_trouve = match2.group(1).strip()
-    donnees["nom_eleve"] = nom_trouve
+    # #############################################################
+    # ÉTAPE 1 : VÉRIFICATION DU NOM (LOGIQUE ULTRA-ROBUSTE)
+    # #############################################################
+    mots_du_nom = nom_eleve_attendu.split()
+    nom_trouve = True
+    for mot in mots_du_nom:
+        # On cherche chaque mot du nom, insensible à la casse
+        if not re.search(re.escape(mot), texte, re.IGNORECASE):
+            nom_trouve = False
+            break # Si un seul mot manque, on arrête
+    
+    if nom_trouve:
+        donnees["nom_eleve"] = nom_eleve_attendu
+    else:
+        # Si la vérification échoue, on arrête tout de suite.
+        return donnees
+
 
     # --- ÉTAPE 2 : Extraction des autres métadonnées ---
     match_moy_gen = re.search(r'Moyenne générale\s+([\d,\.]+)', texte)
@@ -44,7 +44,6 @@ def analyser_texte_bulletin(texte, nom_eleve_attendu, matieres_attendues):
     try:
         match_tableau = re.search(r'Appréciations\n(.+?)\nMoyenne générale', texte, re.DOTALL)
         if not match_tableau:
-            # Si on ne trouve pas le tableau, on renvoie les données déjà collectées
             return donnees
 
         tableau_texte = match_tableau.group(1)
@@ -78,8 +77,6 @@ def analyser_texte_bulletin(texte, nom_eleve_attendu, matieres_attendues):
                     "matiere": nom_matiere, "moyenne": moyenne, "commentaire": commentaire_final
                 })
     except Exception as e:
-        # La variable nom_eleve_attendu est bien définie ici car c'est un argument de la fonction.
         print(f"Erreur de parsing des matières pour l'élève attendu '{nom_eleve_attendu}': {e}")
     
-    # Le 'return' est maintenant en dehors du try/except, il sera toujours exécuté.
     return donnees
