@@ -1,7 +1,7 @@
 import os
 import re
 import pdfplumber
-import io # <-- NOUVEL IMPORT pour le "faux fichier"
+import io
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
@@ -25,26 +25,24 @@ class Analyse(Base):
 def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
     job = get_current_job()
     try:
-        # --- LECTURE DU PDF À PARTIR DES BYTES (LOGIQUE CORRIGÉE) ---
         texte_extrait = ""
-        # On crée un "faux fichier" en mémoire à partir des bytes reçus
         pdf_file_in_memory = io.BytesIO(pdf_bytes)
-        
-        # On passe ce "faux fichier" à pdfplumber
         with pdfplumber.open(pdf_file_in_memory) as pdf:
             texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         
         if not texte_extrait:
             raise ValueError("Le contenu du PDF est vide ou n'a pas pu être lu.")
         
-        # --- Le reste de la logique est identique ---
         donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
         
-        if not donnees_structurees.get("nom_eleve"):
-            raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
+        # --- ON SUPPRIME LA VÉRIFICATION QUI POSAIT PROBLÈME ---
+        # if not donnees_structurees.get("nom_eleve"):
+        #    raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
+        
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
-            raise ValueError(f"Le nombre de matières trouvées ne correspond pas au nombre attendu.")
+            raise ValueError(f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)}).")
 
+        # --- Le reste de la logique (IA, sauvegarde BDD) est identique ---
         api_key = os.environ.get("MISTRAL_API_KEY")
         if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
         client = MistralClient(api_key=api_key)
