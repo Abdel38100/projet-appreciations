@@ -2,6 +2,7 @@ import os
 import re
 import pdfplumber
 import time
+import unicodedata # <-- NOUVEL IMPORT pour la normalisation
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_misaka import Misaka
 import redis
@@ -15,6 +16,21 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 Misaka(app)
 
+# --- NOUVELLE FONCTION UTILITAIRE DE NORMALISATION ---
+def normaliser_chaine(s):
+    """
+    Met une chaîne en minuscules, supprime les accents et les caractères spéciaux
+    pour ne garder que les lettres, chiffres et espaces.
+    """
+    # Étape 1: Décomposer les caractères accentués (ex: 'é' -> 'e' + ´)
+    s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+    # Étape 2: Mettre en minuscule et ne garder que les lettres, chiffres et espaces
+    s = re.sub(r'[^a-z0-9\s]+', '', s.lower())
+    # Étape 3: Remplacer plusieurs espaces par un seul
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+# --- CONFIGURATION ---
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -27,6 +43,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
+# --- GESTION DE LA CONNEXION (FLASK-LOGIN) ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -65,18 +82,18 @@ redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
 conn = redis.from_url(redis_url)
 q = Queue(connection=conn)
 
+# --- ROUTES ---
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('accueil'))
+    if current_user.is_authenticated: return redirect(url_for('accueil'))
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username, password = request.form.get('username'), request.form.get('password')
         if username == admin_user.username and bcrypt.check_password_hash(admin_user.password_hash, password):
             login_user(admin_user)
             return redirect(url_for('accueil'))
         else:
-            flash('Échec de la connexion. Vérifiez le nom d\'utilisateur et le mot de passe.', 'danger')
+            flash('Échec de la connexion.', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -110,24 +127,24 @@ def lancer_analyse():
 
     job_ids = []
     fichiers_traites = set()
-    noms_fichiers = [f.filename for f in fichiers]
+    noms_fichiers_originaux = [f.filename for f in fichiers]
 
     for nom_eleve in eleves_attendus:
         fichier_trouve = None
         
-        mots_nom_eleve = nom_eleve.lower().split()
+        nom_eleve_normalise = normaliser_chaine(nom_eleve)
+        mots_nom_eleve = nom_eleve_normalise.split()
 
         for fichier in fichiers:
-            if fichier.filename in fichiers_traites:
-                continue
+            if fichier.filename in fichiers_traites: continue
 
-            nom_fichier_lower = fichier.filename.lower()
-            if all(mot in nom_fichier_lower for mot in mots_nom_eleve):
+            nom_fichier_normalise = normaliser_chaine(fichier.filename)
+            
+            if all(mot in nom_fichier_normalise for mot in mots_nom_eleve):
                 fichier_trouve = fichier
                 break
         
-        if not fichier_trouve:
-            continue
+        if not fichier_trouve: continue
 
         fichiers_traites.add(fichier_trouve.filename)
         fichier_trouve.seek(0)
@@ -149,9 +166,9 @@ def lancer_analyse():
 
     if not job_ids:
         debug_message = (
-            "Aucune correspondance trouvée entre les élèves et les fichiers. "
+            "Aucune correspondance trouvée entre les élèves et les fichiers. Vérifiez les accents et les tirets. "
             f"Noms d'élèves cherchés : {eleves_attendus}. "
-            f"Noms de fichiers reçus : {noms_fichiers}."
+            f"Noms de fichiers reçus : {noms_fichiers_originaux}."
         )
         flash(debug_message, "danger")
         return redirect(url_for('accueil'))
