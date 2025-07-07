@@ -1,7 +1,6 @@
 import os
 import re
 import pdfplumber
-import time
 import unicodedata
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_misaka import Misaka
@@ -16,14 +15,11 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 Misaka(app)
 
-# --- LA FONCTION DE NORMALISATION QUI A FONCTIONNÉ ---
 def normaliser_chaine(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-    # On garde que les lettres et chiffres, tout le reste est supprimé
     s = re.sub(r'[^a-z0-9]+', '', s.lower())
     return s
 
-# --- CONFIGURATION ---
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -36,7 +32,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
-# --- GESTION DE LA CONNEXION (FLASK-LOGIN) ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -74,8 +69,6 @@ with app.app_context():
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
 conn = redis.from_url(redis_url)
 q = Queue(connection=conn)
-
-# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -119,49 +112,48 @@ def lancer_analyse():
         return "Erreur : Tous les champs sont requis."
 
     job_ids = []
-    fichiers_traites = set()
+    fichiers_ignores = []
 
-    for nom_eleve in eleves_attendus:
-        if len(fichiers_traites) == len(fichiers): break
+    # --- LOGIQUE DE BOUCLE SIMPLE ET FIABLE ---
+    for fichier in fichiers:
+        if not fichier.filename: continue
 
-        fichier_trouve = None
-        
-        # On utilise la méthode de normalisation et de comparaison qui a été validée par le débogage
-        nom_eleve_normalise = normaliser_chaine(nom_eleve)
+        nom_fichier_normalise = normaliser_chaine(fichier.filename)
+        eleve_trouve = None
 
-        for fichier in fichiers:
-            if fichier.filename in fichiers_traites: continue
-            
-            nom_fichier_normalise = normaliser_chaine(fichier.filename)
-            
+        for nom_eleve in eleves_attendus:
+            nom_eleve_normalise = normaliser_chaine(nom_eleve)
             if nom_eleve_normalise in nom_fichier_normalise:
-                fichier_trouve = fichier
+                eleve_trouve = nom_eleve
                 break
         
-        if not fichier_trouve: continue
+        if not eleve_trouve:
+            fichiers_ignores.append(fichier.filename)
+            continue
 
-        fichiers_traites.add(fichier_trouve.filename)
-        
-        fichier_trouve.seek(0)
-        pdf_bytes = fichier_trouve.read()
+        fichier.seek(0)
+        pdf_bytes = fichier.read()
         texte_extrait = ""
         try:
             with pdfplumber.open(pdf_bytes) as pdf:
                 texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         except Exception as e:
-            print(f"Erreur de lecture PDF pour {fichier_trouve.filename}: {e}")
+            print(f"Erreur de lecture PDF pour {fichier.filename}: {e}")
             continue
 
         job = q.enqueue(
             'tasks.traiter_un_bulletin',
-            args=(texte_extrait, nom_eleve, matieres_attendues),
+            args=(texte_extrait, eleve_trouve, matieres_attendues),
             job_timeout='10m'
         )
         job_ids.append(job.get_id())
 
     if not job_ids:
-        flash("Aucune correspondance trouvée. Veuillez vérifier que le nom complet de l'élève (sans accents ni ponctuation) est bien présent dans le nom du fichier PDF.", "danger")
+        flash("Aucune correspondance trouvée. Vérifiez que le nom des élèves est bien présent dans les noms des fichiers.", "danger")
         return redirect(url_for('accueil'))
+
+    if fichiers_ignores:
+        flash(f"Attention : Les fichiers suivants ont été ignorés car aucun élève ne correspondait : {', '.join(fichiers_ignores)}", "warning")
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
 
