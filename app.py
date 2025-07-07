@@ -1,11 +1,12 @@
 import os
 import re
 import pdfplumber
-from flask import Flask, render_template, request
+import time
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_misaka import Misaka
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
-from parser import analyser_texte_bulletin
+import redis
+from rq import Queue
+from tasks import traiter_un_bulletin # On importe notre fonction de tâche
 
 app = Flask(__name__)
 Misaka(app)
@@ -14,12 +15,22 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+# --- Connexion à Redis et initialisation de la file d'attente ---
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+conn = redis.from_url(redis_url)
+q = Queue(connection=conn)
+
 @app.route('/')
 def accueil():
+    """Affiche la page d'accueil simple."""
     return render_template('accueil.html')
 
-@app.route('/analyser', methods=['POST'])
-def analyser_bulletin():
+@app.route('/lancer-analyse', methods=['POST'])
+def lancer_analyse():
+    """
+    Réceptionne les fichiers et crée une tâche pour chaque élève dans la file d'attente.
+    Ne fait AUCUN traitement lourd.
+    """
     fichiers = request.files.getlist('bulletin_pdf')
     liste_matieres_str = request.form.get('liste_matieres', '')
     liste_eleves_str = request.form.get('liste_eleves', '')
@@ -30,107 +41,93 @@ def analyser_bulletin():
     if not fichiers or not matieres_attendues or not eleves_attendus:
         return "Erreur : Vous devez fournir des fichiers, la liste des matières et la liste des élèves."
 
-    tous_les_resultats = []
+    job_ids = []
     fichiers_traites = set()
 
-    # On boucle sur chaque élève de la liste fournie
     for nom_eleve in eleves_attendus:
-        resultat_eleve = {
-            "nom_eleve_attendu": nom_eleve,
-            "nom_fichier": "Non trouvé",
-            "donnees": None,
-            "appreciation_principale": "",
-            "justifications": "",
-            "erreur_validation": None
-        }
         fichier_trouve = None
-
-        # #############################################################
-        # LOGIQUE DE CORRESPONDANCE CORRIGÉE ET SIMPLIFIÉE
-        # #############################################################
         for fichier in fichiers:
-            # On vérifie si le nom de l'élève (en minuscules) est dans le nom de fichier (en minuscules)
             if nom_eleve.lower() in fichier.filename.lower() and fichier.filename not in fichiers_traites:
                 fichier_trouve = fichier
                 break
         
         if not fichier_trouve:
-            resultat_eleve["erreur_validation"] = "Aucun fichier PDF correspondant à cet élève n'a été trouvé dans les fichiers téléversés."
-            tous_les_resultats.append(resultat_eleve)
-            continue # On passe à l'élève suivant
-        
+            # Pour l'instant, on ignore les élèves sans fichier. On pourrait améliorer ça plus tard.
+            continue
+
         fichiers_traites.add(fichier_trouve.filename)
-        resultat_eleve["nom_fichier"] = fichier_trouve.filename
-
-        try:
-            texte_extrait = ""
-            chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier_trouve.filename)
-            try:
-                fichier_trouve.seek(0)
-                fichier_trouve.save(chemin_fichier)
-                with pdfplumber.open(chemin_fichier) as pdf:
-                    texte_extrait = pdf.pages[0].extract_text() or ""
-            finally:
-                if os.path.exists(chemin_fichier): os.remove(chemin_fichier)
-
-            donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve, matieres_attendues)
-            resultat_eleve["donnees"] = donnees_structurees
-
-            if not donnees_structurees.get("nom_eleve"):
-                resultat_eleve["erreur_validation"] = "Le nom de l'élève n'a pas été trouvé DANS le contenu de ce PDF, bien que le nom de fichier corresponde."
-            elif len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
-                 resultat_eleve["erreur_validation"] = f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)})."
-            else:
-                api_key = os.environ.get("MISTRAL_API_KEY")
-                if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
-                client = MistralClient(api_key=api_key)
-                
-                liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
-                
-                prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
-                prompt_utilisateur = f"""
-                Voici les données de l'élève {donnees_structurees['nom_eleve']}.
-                Données brutes :
-                {liste_appreciations}
-                Ta réponse doit être en DEUX parties distinctes, séparées par la ligne "--- JUSTIFICATIONS ---".
-                **Partie 1 : Appréciation Globale**
-                Rédige un paragraphe de 2 à 3 phrases pour le bulletin. Ce texte doit être synthétique, fluide et ne doit PAS mentionner la moyenne générale. Il doit identifier les tendances de fond (qualités, points d'amélioration) sans citer de matières spécifiques.
-                **Partie 2 : Justifications**
-                Sous le séparateur, justifie chaque idée clé de ta synthèse. Pour chaque point, cite les preuves exactes des commentaires des professeurs. Utilise le format suivant :
-                - **Idée synthétisée:** [Ex: L'élève fait preuve de sérieux.]
-                - **Preuves:**
-                - **[Nom de la matière]:** "[Citation exacte du commentaire]"
-                Rédige maintenant ta réponse complète.
-                """
-
-                messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
-                chat_response = client.chat(model="mistral-large-latest", messages=messages, temperature=0.5)
-                reponse_complete_ia = chat_response.choices[0].message.content
-
-                separateur = "--- JUSTIFICATIONS ---"
-                if separateur in reponse_complete_ia:
-                    parties = reponse_complete_ia.split(separateur, 1)
-                    resultat_eleve["appreciation_principale"] = parties[0].strip()
-                    resultat_eleve["justifications"] = parties[1].strip()
-                else:
-                    resultat_eleve["appreciation_principale"] = reponse_complete_ia
-                    resultat_eleve["justifications"] = "L'IA n'a pas fourni de justifications séparées."
-
-        except Exception as e:
-            resultat_eleve["erreur_validation"] = f"ERREUR CRITIQUE lors du traitement du fichier: {e}"
         
-        tous_les_resultats.append(resultat_eleve)
-    
-    # On ajoute à la liste les élèves pour qui aucun fichier n'a été trouvé
-    eleves_traites = {res["nom_eleve_attendu"] for res in tous_les_resultats}
-    eleves_non_trouves = [nom for nom in eleves_attendus if nom not in eleves_traites]
-    for nom in eleves_non_trouves:
-        tous_les_resultats.append({
-            "nom_eleve_attendu": nom,
-            "erreur_validation": "Aucun fichier PDF correspondant à cet élève n'a été trouvé dans les fichiers téléversés."
-        })
+        # On lit le contenu du fichier et on le passe en mémoire.
+        # seek(0) est crucial si on réutilise le même handle de fichier.
+        fichier_trouve.seek(0)
+        pdf_bytes = fichier_trouve.read()
 
-    return render_template('resultat.html', tous_les_resultats=tous_les_resultats)
+        texte_extrait = ""
+        try:
+            with pdfplumber.open(pdf_bytes) as pdf:
+                texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
+        except Exception as e:
+            print(f"Erreur de lecture PDF pour {fichier_trouve.filename}: {e}")
+            continue
+
+        # --- C'EST ICI QUE LA MAGIE OPÈRE ---
+        # On ajoute la tâche à la file d'attente Redis.
+        # q.enqueue() prend la fonction à exécuter et ses arguments.
+        # Le worker exécutera : traiter_un_bulletin(texte_extrait, nom_eleve, matieres_attendues)
+        job = q.enqueue(
+            traiter_un_bulletin,
+            texte_extrait,
+            nom_eleve,
+            matieres_attendues,
+            job_timeout='10m' # On autorise la tâche à durer jusqu'à 10 minutes
+        )
+        job_ids.append(job.get_id())
+
+    # On redirige l'utilisateur vers une page de suivi, en lui passant les ID des tâches lancées.
+    # On joint les ID avec des virgules pour les passer dans l'URL.
+    return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
+
+
+@app.route('/suivi/<job_ids>')
+def page_suivi(job_ids):
+    """Affiche la page qui va suivre l'état des tâches."""
+    # On transforme la chaîne d'ID en une vraie liste
+    id_list = job_ids.split(',')
+    return render_template('suivi.html', job_ids=id_list)
+
+
+@app.route('/statut-jobs', methods=['POST'])
+def statut_jobs():
+    """
+    Point d'API appelé par le JavaScript de la page de suivi.
+    Renvoie l'état actuel de toutes les tâches demandées.
+    """
+    job_ids = request.json.get('job_ids', [])
+    resultats = []
+    
+    for job_id in job_ids:
+        job = q.fetch_job(job_id)
+        if job:
+            status = job.get_status()
+            resultat_tache = None
+            if status == 'finished':
+                resultat_tache = job.result
+            elif status == 'failed':
+                resultat_tache = {
+                    "status": "echec",
+                    "nom_eleve": job.meta.get('nom_eleve', 'Inconnu'),
+                    "erreur": "La tâche a échoué. Voir les logs du worker."
+                }
+
+            resultats.append({
+                "id": job.get_id(),
+                "status": status,
+                "resultat": resultat_tache
+            })
+        else:
+            resultats.append({"id": job_id, "status": "non_trouve"})
+
+    return jsonify(resultats)
 
 if __name__ == '__main__':
     app.run(debug=True)
