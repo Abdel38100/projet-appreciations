@@ -1,33 +1,32 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Analyseur de Bulletins</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <h1>Analyseur de Bulletins Scolaires</h1>
-    <p>Fournissez les bulletins, la liste des matières et la liste des élèves pour une analyse garantie.</p>
-    
-    <form action="{{ url_for('analyser_bulletin') }}" method="post" enctype="multipart/form-data">
-        <div style="margin-bottom: 2em;">
-            <label for="bulletin_pdf">1. Choisir les bulletins PDF :</label><br>
-            <input type="file" id="bulletin_pdf" name="bulletin_pdf" accept=".pdf" required multiple>
-            <p><small>Astuce : Maintenez Ctrl (ou Cmd sur Mac) pour sélectionner plusieurs fichiers.</small></p>
-        </div>
-        <div style="margin-bottom: 2em;">
-            <label for="liste_matieres">2. Liste des matières (dans l'ordre, séparées par une virgule) :</label><br>
-            <textarea id="liste_matieres" name="liste_matieres" rows="6" style="width: 98%;" placeholder="Ex: ENS. MORAL & CIVIQUE, HISTOIRE-GEOGRAPHIE, ..." required></textarea>
-        </div>
-        <div style="margin-bottom: 2em;">
-            <label for="liste_eleves">3. Liste des élèves (NOM Prénom, un par ligne) :</label><br>
-            <textarea id="liste_eleves" name="liste_eleves" rows="10" style="width: 98%;" placeholder="Ex:
+{% extends "base.html" %}
+
+{% block title %}Nouvelle Analyse{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Lancer une nouvelle analyse</h2>
+    </div>
+    <div class="card-body">
+        <p>Téléversez les bulletins et fournissez les listes de matières et d'élèves pour garantir une analyse précise.</p>
+        <form action="{{ url_for('lancer_analyse') }}" method="post" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label for="bulletin_pdf" class="form-label">1. Choisir les bulletins PDF</label>
+                <input class="form-control" type="file" id="bulletin_pdf" name="bulletin_pdf" accept=".pdf" required multiple>
+                <div class="form-text">Astuce : Maintenez Ctrl (ou Cmd sur Mac) pour sélectionner plusieurs fichiers.</div>
+            </div>
+            <div class="mb-3">
+                <label for="liste_matieres" class="form-label">2. Liste des matières (dans l'ordre, séparées par une virgule)</label>
+                <textarea class="form-control" id="liste_matieres" name="liste_matieres" rows="6" placeholder="Ex: ENS. MORAL & CIVIQUE, HISTOIRE-GEOGRAPHIE, ..." required></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="liste_eleves" class="form-label">3. Liste des élèves (NOM Prénom, un par ligne)</label>
+                <textarea class="form-control" id="liste_eleves" name="liste_eleves" rows="10" placeholder="Ex:
 DURAND Jean
 MARTIN Marie" required></textarea>
-        </div>
-        <div>
-            <input type="submit" value="Lancer l'Analyse Complète">
-        </div>
-    </form>
-</body>
-</html>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg">Lancer l'Analyse Complète</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

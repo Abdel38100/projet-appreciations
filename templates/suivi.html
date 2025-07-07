@@ -1,102 +1,115 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Suivi de l'Analyse</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .resultat-bloc { background: #fff; border: 1px solid #ddd; padding: 1.5em; margin-bottom: 1.5em; border-radius: 5px; }
-        .resultat-bloc h2 { margin-top: 0; }
-        .justifications { background-color: #f7f7f7; border-left: 4px solid #6c757d; }
-        .bloc-attente { border-left: 4px solid #ffc107; }
-        .bloc-succes { border-left: 4px solid #28a745; }
-        .bloc-echec { border-left: 4px solid #dc3545; }
-        .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 20px; height: 20px; animation: spin 2s linear infinite; display: inline-block; margin-right: 10px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
-<!-- 
-    NOUVELLE APPROCHE : On stocke la variable du serveur dans un attribut 'data-'
-    Flask va remplacer {{ job_ids | tojson }} par la vraie liste,
-    et le HTML sera valide.
--->
-<body data-job-ids='{{ job_ids | tojson }}'>
+{% extends "base.html" %}
+
+{% block title %}Suivi de l'Analyse{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Suivi de l'Analyse en Temps Réel</h1>
-    <p><a href="{{ url_for('accueil') }}">Lancer une nouvelle analyse</a></p>
+    <div id="compteur" class="fs-5"></div>
+</div>
 
-    <div id="zone-resultats">
-        <!-- Les résultats des tâches apparaîtront ici -->
-    </div>
+<div id="zone-resultats">
+    <!-- Les résultats des tâches apparaîtront ici -->
+</div>
 
-    <script>
-        // On récupère la liste des ID depuis l'attribut 'data-job-ids' du body
-        const jobIds = JSON.parse(document.body.dataset.jobIds);
-        const zoneResultats = document.getElementById('zone-resultats');
+<!-- 
+    On déplace la variable dans le bloc de script, mais en utilisant une technique
+    qui est valide pour VS Code et pour le moteur de template de Flask.
+-->
+<script id="job-data" type="application/json">
+    {{ job_ids | tojson }}
+</script>
 
-        // Le reste du script est identique
-        jobIds.forEach(id => {
-            const div = document.createElement('div');
-            div.className = 'resultat-bloc bloc-attente';
-            div.id = `job-${id}`;
-            div.innerHTML = `<h2><span class="loader"></span>Analyse en cours...</h2><p>ID de la tâche : ${id}</p>`;
-            zoneResultats.appendChild(div);
+<script>
+    // On récupère les données depuis la balise script dédiée
+    const jobDataElement = document.getElementById('job-data');
+    const jobIds = JSON.parse(jobDataElement.textContent);
+
+    const zoneResultats = document.getElementById('zone-resultats');
+    const compteurElement = document.getElementById('compteur');
+    let tachesTerminees = 0;
+
+    function majCompteur() {
+        compteurElement.innerHTML = `<strong>${tachesTerminees} / ${jobIds.length}</strong> tâches terminées`;
+    }
+
+    // Le reste du script est identique
+    jobIds.forEach(id => {
+        const div = document.createElement('div');
+        div.className = 'card mb-3';
+        div.id = `job-${id}`;
+        div.innerHTML = `
+            <div class="card-body d-flex align-items-center">
+                <div class="spinner-border text-primary me-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Analyse en cours pour la tâche ${id}...</span>
+            </div>
+        `;
+        zoneResultats.appendChild(div);
+    });
+    majCompteur();
+
+    function verifierStatut() {
+        const idsEnCours = jobIds.filter(id => {
+            const element = document.getElementById(`job-${id}`);
+            return element && !element.classList.contains('termine');
         });
 
-        function verifierStatut() {
-            const idsEnCours = jobIds.filter(id => {
-                const element = document.getElementById(`job-${id}`);
-                return element && !element.classList.contains('termine');
-            });
-
-            if (idsEnCours.length === 0) {
-                console.log("Toutes les tâches sont terminées.");
-                return;
-            }
-
-            fetch("{{ url_for('statut_jobs') }}", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ job_ids: idsEnCours })
-            })
-            .then(response => response.json())
-            .then(data => {
-                data.forEach(job => {
-                    const div = document.getElementById(`job-${job.id}`);
-                    if (!div || div.classList.contains('termine')) return;
-
-                    if (job.status === 'finished' || job.status === 'failed') {
-                        div.classList.add('termine');
-                        let htmlResultat = '';
-
-                        if (job.status === 'finished' && job.resultat && job.resultat.status === 'succes') {
-                            div.className = 'resultat-bloc bloc-succes';
-                            const res = job.resultat;
-                            htmlResultat = `
-                                <h2>Analyse terminée pour : <strong>${res.nom_eleve}</strong></h2>
-                                <div style="background-color: #e6f7ff; padding: 1em; border-radius: 4px;">
-                                    <h3>Proposition d'Appréciation Globale</h3>
-                                    <textarea rows="4" style="width: 98%;">${res.appreciation_principale}</textarea>
-                                </div>
-                                <div class="justifications" style="margin-top: 1em;">
-                                    <h3>Détail Analytique</h3>
-                                    ${res.justifications}
-                                </div>
-                            `;
-                        } else {
-                            div.className = 'resultat-bloc bloc-echec';
-                            const erreur = (job.resultat && job.resultat.erreur) ? job.resultat.erreur : "Erreur inconnue";
-                            const nomEleve = (job.resultat && job.resultat.nom_eleve) ? job.resultat.nom_eleve : "Élève inconnu";
-                            htmlResultat = `<h2>Échec de l'analyse pour : <strong>${nomEleve}</strong></h2><p>${erreur}</p>`;
-                        }
-                        div.innerHTML = htmlResultat;
-                    }
-                });
-                
-                setTimeout(verifierStatut, 5000);
-            });
+        if (idsEnCours.length === 0) {
+            return;
         }
 
-        setTimeout(verifierStatut, 1000);
-    </script>
-</body>
-</html>
+        fetch("{{ url_for('statut_jobs') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_ids: idsEnCours })
+        })
+        .then(response => response.json())
+        .then(data => {
+            data.forEach(job => {
+                const div = document.getElementById(`job-${job.id}`);
+                if (!div || div.classList.contains('termine')) return;
+
+                if (job.status === 'finished' || job.status === 'failed') {
+                    div.classList.add('termine');
+                    tachesTerminees++;
+                    majCompteur();
+                    let htmlResultat = '';
+
+                    if (job.status === 'finished' && job.resultat && job.resultat.status === 'succes') {
+                        const res = job.resultat;
+                        div.innerHTML = `
+                            <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
+                                <strong>Analyse terminée pour : ${res.nom_eleve}</strong>
+                                <span>Succès</span>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">Proposition d'Appréciation Globale</h5>
+                                <p class="card-text bg-light p-2 rounded">${res.appreciation_principale}</p>
+                                <div class="p-2 mt-2 border rounded">
+                                    <h6 class="card-subtitle mb-2 text-muted">Justifications</h6>
+                                    ${res.justifications}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        div.innerHTML = `
+                            <div class="card-header d-flex justify-content-between align-items-center bg-danger text-white">
+                                <strong>Échec de l'analyse</strong>
+                                <span>Erreur</span>
+                            </div>
+                            <div class="card-body">
+                                ${ (job.resultat && job.resultat.erreur) ? job.resultat.erreur : "Erreur inconnue." }
+                            </div>
+                        `;
+                    }
+                }
+            });
+            setTimeout(verifierStatut, 5000);
+        });
+    }
+
+    setTimeout(verifierStatut, 1000);
+</script>
+{% endblock %}
