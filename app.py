@@ -114,73 +114,55 @@ def lancer_analyse():
         return "Erreur : Tous les champs sont requis."
 
     job_ids = []
-    fichiers_traites = set()
-    
-    # Pour le débogage
-    noms_fichiers_originaux = [f.filename for f in fichiers]
-    comparaisons_debug = []
+    fichiers_non_matches = list(fichiers) # Copie de la liste des fichiers
 
-    for nom_eleve in eleves_attendus:
-        fichier_trouve = None
+    # --- LOGIQUE DE BOUCLE INVERSÉE ET CORRIGÉE ---
+    for fichier in fichiers:
+        if not fichier.filename: continue
         
-        nom_eleve_normalise = normaliser_chaine(nom_eleve)
-        mots_nom_eleve = nom_eleve_normalise.split()
+        nom_fichier_normalise = normaliser_chaine(fichier.filename)
+        eleve_trouve = None
 
-        for fichier in fichiers:
-            if fichier.filename in fichiers_traites: continue
-
-            nom_fichier_normalise = normaliser_chaine(fichier.filename)
+        for nom_eleve in eleves_attendus:
+            nom_eleve_normalise = normaliser_chaine(nom_eleve)
+            mots_nom_eleve = nom_eleve_normalise.split()
             
-            # On stocke les infos de comparaison pour le débogage
-            comparaison = {
-                "nom_eleve": nom_eleve,
-                "nom_fichier": fichier.filename,
-                "nom_eleve_normalise": nom_eleve_normalise,
-                "nom_fichier_normalise": nom_fichier_normalise,
-                "match": all(mot in nom_fichier_normalise for mot in mots_nom_eleve)
-            }
-            comparaisons_debug.append(comparaison)
-
             if all(mot in nom_fichier_normalise for mot in mots_nom_eleve):
-                fichier_trouve = fichier
-                break
+                eleve_trouve = nom_eleve
+                break # On a trouvé l'élève pour ce fichier, on arrête de chercher
         
-        if not fichier_trouve: continue
+        if not eleve_trouve:
+            continue # Si aucun élève ne correspond à ce fichier, on l'ignore
 
-        fichiers_traites.add(fichier_trouve.filename)
-        fichier_trouve.seek(0)
-        pdf_bytes = fichier_trouve.read()
+        # On a trouvé une correspondance ! On lance la tâche.
+        if fichier in fichiers_non_matches:
+            fichiers_non_matches.remove(fichier)
+
+        fichier.seek(0)
+        pdf_bytes = fichier.read()
         texte_extrait = ""
         try:
             with pdfplumber.open(pdf_bytes) as pdf:
                 texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         except Exception as e:
-            print(f"Erreur de lecture PDF pour {fichier_trouve.filename}: {e}")
+            print(f"Erreur de lecture PDF pour {fichier.filename}: {e}")
             continue
 
         job = q.enqueue(
             'tasks.traiter_un_bulletin',
-            args=(texte_extrait, nom_eleve, matieres_attendues),
+            args=(texte_extrait, eleve_trouve, matieres_attendues),
             job_timeout='10m'
         )
         job_ids.append(job.get_id())
 
     if not job_ids:
-        # --- MESSAGE DE DÉBOGAGE AMÉLIORÉ ---
-        debug_html = "<h3>Détail des comparaisons :</h3><ul>"
-        for comp in comparaisons_debug:
-            resultat_match = "✅ Trouvé" if comp["match"] else "❌ Non trouvé"
-            debug_html += (
-                f"<li>"
-                f"<strong>Élève :</strong> {comp['nom_eleve']} (normalisé -> '{comp['nom_eleve_normalise']}')<br>"
-                f"<strong>Fichier :</strong> {comp['nom_fichier']} (normalisé -> '{comp['nom_fichier_normalise']}')<br>"
-                f"<strong>Résultat :</strong> {resultat_match}"
-                f"</li><br>"
-            )
-        debug_html += "</ul>"
-
-        flash(debug_html, "danger")
+        flash("Aucun fichier n'a pu être associé à un élève de la liste.", "danger")
         return redirect(url_for('accueil'))
+
+    # On peut aussi informer sur les fichiers qui n'ont pas trouvé de correspondance
+    if fichiers_non_matches:
+        noms_fichiers_ignores = [f.filename for f in fichiers_non_matches]
+        flash(f"Attention : Les fichiers suivants ont été ignorés car aucun élève ne correspondait : {', '.join(noms_fichiers_ignores)}", "warning")
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
 
