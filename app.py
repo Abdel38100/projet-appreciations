@@ -45,11 +45,12 @@ def analyser_bulletin():
         }
         fichier_trouve = None
 
-        # On cherche le fichier PDF correspondant au nom de l'élève
+        # #############################################################
+        # LOGIQUE DE CORRESPONDANCE CORRIGÉE ET SIMPLIFIÉE
+        # #############################################################
         for fichier in fichiers:
-            # On normalise le nom de l'élève (ex: "DUPONT Jean-Marie" -> "dupont-jean-marie") pour la comparaison
-            nom_eleve_simple = re.sub(r'\s+', '-', nom_eleve.lower())
-            if nom_eleve_simple in fichier.filename.lower() and fichier.filename not in fichiers_traites:
+            # On vérifie si le nom de l'élève (en minuscules) est dans le nom de fichier (en minuscules)
+            if nom_eleve.lower() in fichier.filename.lower() and fichier.filename not in fichiers_traites:
                 fichier_trouve = fichier
                 break
         
@@ -65,7 +66,7 @@ def analyser_bulletin():
             texte_extrait = ""
             chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier_trouve.filename)
             try:
-                fichier_trouve.seek(0) # Important quand on lit plusieurs fois un même flux de fichier
+                fichier_trouve.seek(0)
                 fichier_trouve.save(chemin_fichier)
                 with pdfplumber.open(chemin_fichier) as pdf:
                     texte_extrait = pdf.pages[0].extract_text() or ""
@@ -75,13 +76,11 @@ def analyser_bulletin():
             donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve, matieres_attendues)
             resultat_eleve["donnees"] = donnees_structurees
 
-            # --- Validation après parsing ---
             if not donnees_structurees.get("nom_eleve"):
                 resultat_eleve["erreur_validation"] = "Le nom de l'élève n'a pas été trouvé DANS le contenu de ce PDF, bien que le nom de fichier corresponde."
             elif len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
                  resultat_eleve["erreur_validation"] = f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)})."
             else:
-                # --- Si tout est bon, on lance l'IA ---
                 api_key = os.environ.get("MISTRAL_API_KEY")
                 if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
                 client = MistralClient(api_key=api_key)
@@ -122,6 +121,15 @@ def analyser_bulletin():
         
         tous_les_resultats.append(resultat_eleve)
     
+    # On ajoute à la liste les élèves pour qui aucun fichier n'a été trouvé
+    eleves_traites = {res["nom_eleve_attendu"] for res in tous_les_resultats}
+    eleves_non_trouves = [nom for nom in eleves_attendus if nom not in eleves_traites]
+    for nom in eleves_non_trouves:
+        tous_les_resultats.append({
+            "nom_eleve_attendu": nom,
+            "erreur_validation": "Aucun fichier PDF correspondant à cet élève n'a été trouvé dans les fichiers téléversés."
+        })
+
     return render_template('resultat.html', tous_les_resultats=tous_les_resultats)
 
 if __name__ == '__main__':
