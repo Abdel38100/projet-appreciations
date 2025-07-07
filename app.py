@@ -2,7 +2,7 @@ import os
 import re
 import pdfplumber
 import time
-import unicodedata # <-- NOUVEL IMPORT pour la normalisation
+import unicodedata
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_misaka import Misaka
 import redis
@@ -16,21 +16,12 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 Misaka(app)
 
-# --- NOUVELLE FONCTION UTILITAIRE DE NORMALISATION ---
 def normaliser_chaine(s):
-    """
-    Met une chaîne en minuscules, supprime les accents et les caractères spéciaux
-    pour ne garder que les lettres, chiffres et espaces.
-    """
-    # Étape 1: Décomposer les caractères accentués (ex: 'é' -> 'e' + ´)
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-    # Étape 2: Mettre en minuscule et ne garder que les lettres, chiffres et espaces
     s = re.sub(r'[^a-z0-9\s]+', '', s.lower())
-    # Étape 3: Remplacer plusieurs espaces par un seul
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
-# --- CONFIGURATION ---
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -43,7 +34,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
-# --- GESTION DE LA CONNEXION (FLASK-LOGIN) ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -81,8 +71,6 @@ with app.app_context():
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
 conn = redis.from_url(redis_url)
 q = Queue(connection=conn)
-
-# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -127,7 +115,10 @@ def lancer_analyse():
 
     job_ids = []
     fichiers_traites = set()
+    
+    # Pour le débogage
     noms_fichiers_originaux = [f.filename for f in fichiers]
+    comparaisons_debug = []
 
     for nom_eleve in eleves_attendus:
         fichier_trouve = None
@@ -140,6 +131,16 @@ def lancer_analyse():
 
             nom_fichier_normalise = normaliser_chaine(fichier.filename)
             
+            # On stocke les infos de comparaison pour le débogage
+            comparaison = {
+                "nom_eleve": nom_eleve,
+                "nom_fichier": fichier.filename,
+                "nom_eleve_normalise": nom_eleve_normalise,
+                "nom_fichier_normalise": nom_fichier_normalise,
+                "match": all(mot in nom_fichier_normalise for mot in mots_nom_eleve)
+            }
+            comparaisons_debug.append(comparaison)
+
             if all(mot in nom_fichier_normalise for mot in mots_nom_eleve):
                 fichier_trouve = fichier
                 break
@@ -165,15 +166,24 @@ def lancer_analyse():
         job_ids.append(job.get_id())
 
     if not job_ids:
-        debug_message = (
-            "Aucune correspondance trouvée entre les élèves et les fichiers. Vérifiez les accents et les tirets. "
-            f"Noms d'élèves cherchés : {eleves_attendus}. "
-            f"Noms de fichiers reçus : {noms_fichiers_originaux}."
-        )
-        flash(debug_message, "danger")
+        # --- MESSAGE DE DÉBOGAGE AMÉLIORÉ ---
+        debug_html = "<h3>Détail des comparaisons :</h3><ul>"
+        for comp in comparaisons_debug:
+            resultat_match = "✅ Trouvé" if comp["match"] else "❌ Non trouvé"
+            debug_html += (
+                f"<li>"
+                f"<strong>Élève :</strong> {comp['nom_eleve']} (normalisé -> '{comp['nom_eleve_normalise']}')<br>"
+                f"<strong>Fichier :</strong> {comp['nom_fichier']} (normalisé -> '{comp['nom_fichier_normalise']}')<br>"
+                f"<strong>Résultat :</strong> {resultat_match}"
+                f"</li><br>"
+            )
+        debug_html += "</ul>"
+
+        flash(debug_html, "danger")
         return redirect(url_for('accueil'))
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
+
 
 @app.route('/suivi/<job_ids>')
 @login_required
