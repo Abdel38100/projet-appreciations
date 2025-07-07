@@ -15,7 +15,6 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 Misaka(app)
 
-# --- FONCTIONS & CONFIGURATION (INCHANGÉES) ---
 def normaliser_chaine(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
     s = re.sub(r'[^a-z0-9]+', '', s.lower())
@@ -33,7 +32,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 
-# --- GESTION DE LA CONNEXION (INCHANGÉE) ---
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -71,8 +69,6 @@ with app.app_context():
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
 conn = redis.from_url(redis_url)
 q = Queue(connection=conn)
-
-# --- ROUTES ---
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -115,7 +111,6 @@ def lancer_analyse():
     if not all([fichiers, matieres_attendues, eleves_attendus]):
         return "Erreur : Tous les champs sont requis."
 
-    # On ne traite que le nombre de fichiers uploadés
     nombre_a_traiter = len(fichiers)
     if len(eleves_attendus) < nombre_a_traiter:
         flash(f"Erreur : Vous avez téléversé {nombre_a_traiter} fichiers mais seulement fourni {len(eleves_attendus)} noms d'élèves.", "danger")
@@ -123,32 +118,34 @@ def lancer_analyse():
 
     job_ids = []
 
-    # --- LOGIQUE DE CORRESPONDANCE PAR ORDRE ---
     for i in range(nombre_a_traiter):
         fichier = fichiers[i]
         nom_eleve = eleves_attendus[i]
 
         if not fichier.filename: continue
 
-        fichier.seek(0)
-        pdf_bytes = fichier.read()
-        texte_extrait = ""
+        chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
         try:
-            with pdfplumber.open(pdf_bytes) as pdf:
-                texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
-        except Exception as e:
-            print(f"Erreur de lecture PDF pour {fichier.filename}: {e}")
-            continue
+            fichier.save(chemin_fichier)
+            with open(chemin_fichier, "rb") as f:
+                pdf_bytes = f.read()
 
-        job = q.enqueue(
-            'tasks.traiter_un_bulletin',
-            args=(texte_extrait, nom_eleve, matieres_attendues),
-            job_timeout='10m'
-        )
-        job_ids.append(job.get_id())
+            job = q.enqueue(
+                'tasks.traiter_un_bulletin',
+                args=(pdf_bytes, nom_eleve, matieres_attendues),
+                job_timeout='10m'
+            )
+            job_ids.append(job.get_id())
+
+        except Exception as e:
+            print(f"Erreur lors de la sauvegarde/lecture du fichier {fichier.filename}: {e}")
+            continue
+        finally:
+            if os.path.exists(chemin_fichier):
+                os.remove(chemin_fichier)
 
     if not job_ids:
-        flash("Aucune tâche d'analyse n'a pu être lancée.", "danger")
+        flash("Aucune tâche d'analyse n'a pu être lancée. Vérifiez les logs du serveur pour des erreurs de lecture de PDF.", "danger")
         return redirect(url_for('accueil'))
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
@@ -177,15 +174,11 @@ def statut_jobs():
                 if analyse_sauvegardee:
                     resultat_final = { "status": "succes", "nom_eleve": analyse_sauvegardee.nom_eleve, "appreciation_principale": analyse_sauvegardee.appreciation_principale, "justifications": analyse_sauvegardee.justifications }
             elif status == 'failed':
-                # On essaie de récupérer le message d'erreur de la tâche
                 erreur_msg = job.exc_info.strip().split('\n')[-1] if job.exc_info else "La tâche a échoué sans message."
                 resultat_final = {"status": "echec", "erreur": erreur_msg}
             
-            # On passe le nom de l'élève attendu au template, même en cas d'échec
-            if not resultat_final:
-                resultat_final = {}
-            if job.args: # Les arguments passés à la tâche
-                 resultat_final['nom_eleve'] = job.args[1]
+            if not resultat_final: resultat_final = {}
+            if job.args: resultat_final['nom_eleve'] = job.args[1]
 
             resultats.append({"id": job.get_id(), "status": status, "resultat": resultat_final})
         else:

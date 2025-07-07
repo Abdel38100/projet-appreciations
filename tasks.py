@@ -1,19 +1,19 @@
 import os
+import re
+import pdfplumber
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from rq import get_current_job
-
-# On a besoin de définir le modèle ici pour que la tâche sache à quoi ressemble la table
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, String, Text, DateTime, func
 
 Base = declarative_base()
 
 class Analyse(Base):
-    __tablename__ = 'analyse' # Le nom de la table en BDD
+    __tablename__ = 'analyse'
     id = Column(String(36), primary_key=True)
     nom_eleve = Column(String(200), nullable=False)
     moyenne_generale = Column(String(10))
@@ -21,20 +21,25 @@ class Analyse(Base):
     justifications = Column(Text)
     cree_le = Column(DateTime, server_default=func.now())
 
-def traiter_un_bulletin(texte_brut, nom_eleve_attendu, matieres_attendues):
-    """Tâche exécutée en arrière-plan par le worker."""
+def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
     job = get_current_job()
     try:
-        # 1. Parsing du texte
-        donnees_structurees = analyser_texte_bulletin(texte_brut, nom_eleve_attendu, matieres_attendues)
+        # --- LECTURE DU PDF À PARTIR DES BYTES ---
+        texte_extrait = ""
+        with pdfplumber.open(pdf_bytes) as pdf:
+            texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         
-        # 2. Validation
+        if not texte_extrait:
+            raise ValueError("Le contenu du PDF est vide ou n'a pas pu être lu.")
+        
+        # Le reste de la logique est identique
+        donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
+        
         if not donnees_structurees.get("nom_eleve"):
             raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
             raise ValueError(f"Le nombre de matières trouvées ne correspond pas au nombre attendu.")
 
-        # 3. Appel à l'IA de Mistral
         api_key = os.environ.get("MISTRAL_API_KEY")
         if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
         client = MistralClient(api_key=api_key)
@@ -68,7 +73,6 @@ def traiter_un_bulletin(texte_brut, nom_eleve_attendu, matieres_attendues):
             appreciation_principale = reponse_complete_ia
             justifications = "L'IA n'a pas fourni de justifications séparées."
         
-        # 4. SAUVEGARDE EN BASE DE DONNÉES
         db_url = os.getenv('DATABASE_URL')
         if db_url and db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -90,5 +94,4 @@ def traiter_un_bulletin(texte_brut, nom_eleve_attendu, matieres_attendues):
 
     except Exception as e:
         print(f"ERREUR DANS LA TÂCHE pour {nom_eleve_attendu}: {e}")
-        # En cas d'erreur, on la propage pour que RQ marque la tâche comme "failed"
         raise e
