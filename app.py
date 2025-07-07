@@ -16,9 +16,10 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 Misaka(app)
 
-# --- FONCTION DE NORMALISATION VALIDÉE ---
+# --- LA FONCTION DE NORMALISATION QUI A FONCTIONNÉ ---
 def normaliser_chaine(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+    # On garde que les lettres et chiffres, tout le reste est supprimé
     s = re.sub(r'[^a-z0-9]+', '', s.lower())
     return s
 
@@ -120,18 +121,19 @@ def lancer_analyse():
     job_ids = []
     fichiers_traites = set()
 
-    # On utilise la boucle qui a fonctionné pour le débogage
     for nom_eleve in eleves_attendus:
         if len(fichiers_traites) == len(fichiers): break
 
         fichier_trouve = None
+        
+        # On utilise la méthode de normalisation et de comparaison qui a été validée par le débogage
         nom_eleve_normalise = normaliser_chaine(nom_eleve)
 
         for fichier in fichiers:
             if fichier.filename in fichiers_traites: continue
+            
             nom_fichier_normalise = normaliser_chaine(fichier.filename)
             
-            # On utilise la méthode de comparaison qui a fonctionné
             if nom_eleve_normalise in nom_fichier_normalise:
                 fichier_trouve = fichier
                 break
@@ -158,11 +160,10 @@ def lancer_analyse():
         job_ids.append(job.get_id())
 
     if not job_ids:
-        flash("Aucune correspondance trouvée. Vérifiez que les noms d'élèves sont bien présents dans les noms des fichiers PDF.", "danger")
+        flash("Aucune correspondance trouvée. Veuillez vérifier que le nom complet de l'élève (sans accents ni ponctuation) est bien présent dans le nom du fichier PDF.", "danger")
         return redirect(url_for('accueil'))
 
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
-
 
 @app.route('/suivi/<job_ids>')
 @login_required
