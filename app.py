@@ -114,58 +114,51 @@ def lancer_analyse():
         return "Erreur : Tous les champs sont requis."
 
     job_ids = []
-    fichiers_non_matches = list(fichiers) # Copie de la liste des fichiers
+    fichiers_traites = set()
 
-    # --- LOGIQUE DE BOUCLE INVERSÉE ET CORRIGÉE ---
-    for fichier in fichiers:
-        if not fichier.filename: continue
-        
-        nom_fichier_normalise = normaliser_chaine(fichier.filename)
-        eleve_trouve = None
+    # On rétablit la boucle qui marche : on parcourt les élèves
+    for nom_eleve in eleves_attendus:
+        # Condition de sortie : si on a déjà traité tous les fichiers uploadés, on arrête
+        if len(fichiers_traites) == len(fichiers):
+            break
 
-        for nom_eleve in eleves_attendus:
-            nom_eleve_normalise = normaliser_chaine(nom_eleve)
-            mots_nom_eleve = nom_eleve_normalise.split()
-            
+        fichier_trouve = None
+        nom_eleve_normalise = normaliser_chaine(nom_eleve)
+        mots_nom_eleve = nom_eleve_normalise.split()
+
+        for fichier in fichiers:
+            if fichier.filename in fichiers_traites: continue
+            nom_fichier_normalise = normaliser_chaine(fichier.filename)
             if all(mot in nom_fichier_normalise for mot in mots_nom_eleve):
-                eleve_trouve = nom_eleve
-                break # On a trouvé l'élève pour ce fichier, on arrête de chercher
+                fichier_trouve = fichier
+                break
         
-        if not eleve_trouve:
-            continue # Si aucun élève ne correspond à ce fichier, on l'ignore
+        if not fichier_trouve: continue
 
-        # On a trouvé une correspondance ! On lance la tâche.
-        if fichier in fichiers_non_matches:
-            fichiers_non_matches.remove(fichier)
-
-        fichier.seek(0)
-        pdf_bytes = fichier.read()
+        fichiers_traites.add(fichier_trouve.filename)
+        
+        fichier_trouve.seek(0)
+        pdf_bytes = fichier_trouve.read()
         texte_extrait = ""
         try:
             with pdfplumber.open(pdf_bytes) as pdf:
                 texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         except Exception as e:
-            print(f"Erreur de lecture PDF pour {fichier.filename}: {e}")
+            print(f"Erreur de lecture PDF pour {fichier_trouve.filename}: {e}")
             continue
 
         job = q.enqueue(
             'tasks.traiter_un_bulletin',
-            args=(texte_extrait, eleve_trouve, matieres_attendues),
+            args=(texte_extrait, nom_eleve, matieres_attendues),
             job_timeout='10m'
         )
         job_ids.append(job.get_id())
 
     if not job_ids:
-        flash("Aucun fichier n'a pu être associé à un élève de la liste.", "danger")
+        flash("Aucune correspondance trouvée entre les élèves de votre liste et les noms des fichiers PDF. Veuillez vérifier l'orthographe et les noms de fichiers.", "danger")
         return redirect(url_for('accueil'))
 
-    # On peut aussi informer sur les fichiers qui n'ont pas trouvé de correspondance
-    if fichiers_non_matches:
-        noms_fichiers_ignores = [f.filename for f in fichiers_non_matches]
-        flash(f"Attention : Les fichiers suivants ont été ignorés car aucun élève ne correspondait : {', '.join(noms_fichiers_ignores)}", "warning")
-
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
-
 
 @app.route('/suivi/<job_ids>')
 @login_required
