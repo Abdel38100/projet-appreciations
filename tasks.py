@@ -1,6 +1,7 @@
 import os
 import re
 import pdfplumber
+import io # <-- NOUVEL IMPORT pour le "faux fichier"
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
@@ -24,15 +25,19 @@ class Analyse(Base):
 def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
     job = get_current_job()
     try:
-        # --- LECTURE DU PDF À PARTIR DES BYTES ---
+        # --- LECTURE DU PDF À PARTIR DES BYTES (LOGIQUE CORRIGÉE) ---
         texte_extrait = ""
-        with pdfplumber.open(pdf_bytes) as pdf:
+        # On crée un "faux fichier" en mémoire à partir des bytes reçus
+        pdf_file_in_memory = io.BytesIO(pdf_bytes)
+        
+        # On passe ce "faux fichier" à pdfplumber
+        with pdfplumber.open(pdf_file_in_memory) as pdf:
             texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
         
         if not texte_extrait:
             raise ValueError("Le contenu du PDF est vide ou n'a pas pu être lu.")
         
-        # Le reste de la logique est identique
+        # --- Le reste de la logique est identique ---
         donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
         
         if not donnees_structurees.get("nom_eleve"):
