@@ -92,11 +92,13 @@ def logout():
 def accueil():
     return render_template('accueil.html')
 
+# --- VÉRIFIEZ BIEN LA PRÉSENCE DE CETTE FONCTION ---
 @app.route('/historique')
 @login_required
 def historique():
     analyses_sauvegardees = Analyse.query.order_by(Analyse.cree_le.desc()).all()
     return render_template('historique.html', analyses=analyses_sauvegardees)
+# ----------------------------------------------------
 
 @app.route('/lancer-analyse', methods=['POST'])
 @login_required
@@ -159,8 +161,7 @@ def statut_jobs():
                 analyse_sauvegardee = Analyse.query.get(job_id)
                 if analyse_sauvegardee:
                     resultat_final = { 
-                        "status": "succes", 
-                        "nom_eleve": analyse_sauvegardee.nom_eleve, 
+                        "status": "succes", "nom_eleve": analyse_sauvegardee.nom_eleve, 
                         "appreciation_principale": analyse_sauvegardee.appreciation_principale, 
                         "justifications_html": MisakaMarkdown(analyse_sauvegardee.justifications or ""),
                         "donnees": analyse_sauvegardee.donnees_brutes 
