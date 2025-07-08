@@ -92,13 +92,11 @@ def logout():
 def accueil():
     return render_template('accueil.html')
 
-# --- VÉRIFIEZ BIEN LA PRÉSENCE DE CETTE FONCTION ---
 @app.route('/historique')
 @login_required
 def historique():
     analyses_sauvegardees = Analyse.query.order_by(Analyse.cree_le.desc()).all()
     return render_template('historique.html', analyses=analyses_sauvegardees)
-# ----------------------------------------------------
 
 @app.route('/lancer-analyse', methods=['POST'])
 @login_required
@@ -108,15 +106,12 @@ def lancer_analyse():
     liste_eleves_str = request.form.get('liste_eleves', '')
     matieres_attendues = [m.strip() for m in liste_matieres_str.split(',') if m.strip()]
     eleves_attendus = [e.strip() for e in liste_eleves_str.split('\n') if e.strip()]
-
     if not all([fichiers, matieres_attendues, eleves_attendus]):
         return "Erreur : Tous les champs sont requis."
-
     nombre_a_traiter = len(fichiers)
     if len(eleves_attendus) < nombre_a_traiter:
         flash(f"Erreur : Vous avez téléversé {nombre_a_traiter} fichiers mais seulement fourni {len(eleves_attendus)} noms d'élèves.", "danger")
         return redirect(url_for('accueil'))
-
     job_ids = []
     for i in range(nombre_a_traiter):
         fichier = fichiers[i]
@@ -134,7 +129,6 @@ def lancer_analyse():
             continue
         finally:
             if os.path.exists(chemin_fichier): os.remove(chemin_fichier)
-
     if not job_ids:
         flash("Aucune tâche d'analyse n'a pu être lancée.", "danger")
         return redirect(url_for('accueil'))
@@ -151,7 +145,6 @@ def page_suivi(job_ids):
 def statut_jobs():
     job_ids = request.json.get('job_ids', [])
     resultats = []
-    
     for job_id in job_ids:
         job = q.fetch_job(job_id)
         resultat_final = None
@@ -160,22 +153,23 @@ def statut_jobs():
             if status == 'finished':
                 analyse_sauvegardee = Analyse.query.get(job_id)
                 if analyse_sauvegardee:
-                    resultat_final = { 
-                        "status": "succes", "nom_eleve": analyse_sauvegardee.nom_eleve, 
-                        "appreciation_principale": analyse_sauvegardee.appreciation_principale, 
-                        "justifications_html": MisakaMarkdown(analyse_sauvegardee.justifications or ""),
-                        "donnees": analyse_sauvegardee.donnees_brutes 
-                    }
+                    resultat_final = {"status": "succes", "nom_eleve": analyse_sauvegardee.nom_eleve, "appreciation_principale": analyse_sauvegardee.appreciation_principale, "justifications_html": MisakaMarkdown(analyse_sauvegardee.justifications or ""), "donnees": analyse_sauvegardee.donnees_brutes}
             elif status == 'failed':
                 erreur_msg = job.exc_info.strip().split('\n')[-1] if job.exc_info else "La tâche a échoué."
                 resultat_final = {"status": "echec", "erreur": erreur_msg}
-            
             if not resultat_final: resultat_final = {}
             if job.args: resultat_final['nom_eleve'] = job.args[1]
             resultats.append({"id": job.get_id(), "status": status, "resultat": resultat_final})
         else:
             resultats.append({"id": job_id, "status": "non_trouve"})
     return jsonify(resultats)
+
+# --- DÉBOGAGE : AFFICHER TOUTES LES ROUTES CONNUES ---
+with app.app_context():
+    print("--- ROUTES ENREGISTRÉES AU LANCEMENT ---")
+    for rule in app.url_map.iter_rules():
+        print(f"Endpoint: {rule.endpoint}, URL: {rule.rule}")
+    print("----------------------------------------")
 
 if __name__ == '__main__':
     app.run(debug=True)
