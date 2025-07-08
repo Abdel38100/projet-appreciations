@@ -92,11 +92,13 @@ def logout():
 def accueil():
     return render_template('accueil.html')
 
-@app.route('/historique')
+# --- ON CHANGE L'URL ICI ---
+@app.route('/history') # Anciennement '/historique'
 @login_required
-def historique():
+def history(): # On renomme aussi la fonction pour la clarté
     analyses_sauvegardees = Analyse.query.order_by(Analyse.cree_le.desc()).all()
     return render_template('historique.html', analyses=analyses_sauvegardees)
+# ---------------------------
 
 @app.route('/lancer-analyse', methods=['POST'])
 @login_required
@@ -164,12 +166,6 @@ def statut_jobs():
             resultats.append({"id": job_id, "status": "non_trouve"})
     return jsonify(resultats)
 
-# --- DÉBOGAGE : AFFICHER TOUTES LES ROUTES CONNUES ---
-with app.app_context():
-    print("--- ROUTES ENREGISTRÉES AU LANCEMENT ---")
-    for rule in app.url_map.iter_rules():
-        print(f"Endpoint: {rule.endpoint}, URL: {rule.rule}")
-    print("----------------------------------------")
-
+# On enlève le bloc de débogage des routes
 if __name__ == '__main__':
     app.run(debug=True)
