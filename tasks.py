@@ -2,6 +2,7 @@ import os
 import re
 import pdfplumber
 import io
+import time # <-- NOUVEL IMPORT
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
@@ -37,6 +38,9 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         
         donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
         
+        if not donnees_structurees.get("nom_eleve"):
+             raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
+        
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
             raise ValueError(f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)}).")
 
@@ -52,16 +56,11 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         {liste_appreciations}
         Ta réponse doit être en DEUX parties distinctes, séparées par la ligne "--- JUSTIFICATIONS ---".
         **Partie 1 : Appréciation Globale**
-        Rédige un paragraphe de 2 à 3 phrases pour le bulletin. Ce texte doit être synthétique et fluide. Il doit identifier les tendances de fond (qualités, points d'amélioration) sans citer de matières spécifiques.
+        Rédige un paragraphe de 2 à 3 phrases pour le bulletin.
         **Partie 2 : Justifications**
-        Sous le séparateur, justifie chaque idée clé de ta synthèse. Pour chaque idée, cite les extraits BRUTS et EXACTS des commentaires des professeurs qui la prouvent. Utilise le format Markdown suivant :
-        - **Idée synthétisée:** [Ex: L'élève montre un grand sérieux.]
-          - **Preuves:**
-            - **[Nom de la matière]:** "[Citation exacte et brute du commentaire]"
-            - **[Autre matière]:** "[Autre citation brute]"
+        Sous le séparateur, justifie chaque idée clé de ta synthèse.
         Rédige maintenant ta réponse complète.
         """
-        
         messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
         chat_response = client.chat(model="mistral-large-latest", messages=messages, temperature=0.5)
         reponse_complete_ia = chat_response.choices[0].message.content
@@ -94,6 +93,13 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         session.add(nouvelle_analyse)
         session.commit()
         session.close()
+
+        # --- AJOUT DE LA PAUSE ---
+        # On attend 5 secondes pour être "poli" avec l'API de Mistral
+        # et éviter de dépasser la limite de requêtes par minute.
+        print(f"Tâche pour {nom_eleve_attendu} terminée. Pause de 5 secondes...")
+        time.sleep(5)
+        # -------------------------
 
     except Exception as e:
         print(f"ERREUR DANS LA TÂCHE pour {nom_eleve_attendu}: {e}")
