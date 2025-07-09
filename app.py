@@ -203,8 +203,8 @@ def supprimer_classe(classe_id):
     flash("La classe et toutes ses analyses ont été supprimées.", "info")
     return redirect(url_for('configuration'))
     
-with app.app_context():
-    db.create_all()
+#with app.app_context():
+#    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)
