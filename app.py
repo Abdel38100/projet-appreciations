@@ -16,24 +16,38 @@ from sqlalchemy.dialects.postgresql import JSONB
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 Misaka(app)
-db_url = os.getenv('DATABASE_URL')
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# --- CONFIGURATION DE LA BASE DE DONNÉES (CORRIGÉE) ---
+db_url = os.getenv('DATABASE_URL')
+if db_url:
+    # SQLAlchemy préfère 'postgresql://' au lieu de 'postgres://'
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+else:
+    # Fournit une valeur par défaut pour éviter de planter si la variable n'est pas définie
+    # Cela peut arriver en local ou lors d'un démarrage à froid.
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///local.db'
+    print("ATTENTION: DATABASE_URL non trouvée, utilisation d'une base de données SQLite locale.")
+
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Initialisation des extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 
-# --- MODÈLES DE BASE DE DONNÉES ---
+# --- MODÈLES ---
 class Classe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     annee_scolaire = db.Column(db.String(10), nullable=False)
     nom_classe = db.Column(db.String(50), nullable=False)
-    matieres = db.Column(db.Text, nullable=False) # Liste des matières, séparées par une virgule
+    matieres = db.Column(db.Text, nullable=False)
     analyses = db.relationship('Analyse', backref='classe', lazy=True, cascade="all, delete-orphan")
 
 class Analyse(db.Model):
