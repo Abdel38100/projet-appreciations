@@ -2,40 +2,23 @@ import os
 import re
 import pdfplumber
 import unicodedata
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from flask_misaka import Misaka # On s'assure que l'import est bien là
-import redis
-from rq import Queue
-from tasks import traiter_un_bulletin
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.postgresql import JSONB
+import io
+from flask import Flask, render_template, request, flash, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
+from flask_misaka import markdown as MisakaMarkdown
+from groq import Groq
+from parser import analyser_texte_bulletin
 
-# 1. Initialisation de l'application
+# --- INITIALISATION ET CONFIGURATION ---
 app = Flask(__name__)
-Misaka(app) # <-- LA LIGNE MANQUANTE À RAJOUTER
-
-# 2. Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
-app.config['UPLOAD_FOLDER'] = 'uploads'
-db_url = os.getenv('DATABASE_URL')
-if db_url and db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-
-# 3. Initialisation des extensions
-db = SQLAlchemy(app)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 
-# 4. Modèle User et fonction de chargement
+# --- GESTION DE L'UTILISATEUR ---
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
@@ -46,35 +29,14 @@ def load_user(user_id):
         return User(user_id)
     return None
 
-# 5. Modèle de la base de données
-class Analyse(db.Model):
-    id = db.Column(db.String(36), primary_key=True)
-    nom_eleve = db.Column(db.String(200), nullable=False)
-    moyenne_generale = db.Column(db.String(10))
-    appreciation_principale = db.Column(db.Text, nullable=False)
-    justifications = db.Column(db.Text)
-    donnees_brutes = db.Column(JSONB)
-    cree_le = db.Column(db.DateTime, server_default=db.func.now())
-
-# 6. Connexion Redis
-try:
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-    conn = redis.from_url(redis_url)
-    q = Queue(connection=conn)
-except Exception as e:
-    print(f"Erreur de connexion à Redis: {e}")
-    q = None
-
-# 7. Routes de l'application
+# --- ROUTES ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('accueil'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        ADMIN_USERNAME = os.getenv('APP_USERNAME')
-        ADMIN_PASSWORD = os.getenv('APP_PASSWORD')
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if username == os.getenv('APP_USERNAME') and password == os.getenv('APP_PASSWORD'):
             user = User(id=1)
             login_user(user)
             return redirect(url_for('accueil'))
@@ -93,92 +55,75 @@ def logout():
 def accueil():
     return render_template('accueil.html')
 
-@app.route('/history')
+@app.route('/analyser', methods=['POST'])
 @login_required
-def history():
-    try:
-        analyses_sauvegardees = Analyse.query.order_by(Analyse.cree_le.desc()).all()
-        return render_template('historique.html', analyses=analyses_sauvegardees)
-    except Exception as e:
-        print(f"Erreur lors de la récupération de l'historique : {e}")
-        flash("Une erreur s'est produite en essayant de charger l'historique.", "danger")
-        return redirect(url_for('accueil'))
-
-@app.route('/lancer-analyse', methods=['POST'])
-@login_required
-def lancer_analyse():
-    if not q:
-        flash("Le service d'analyse est indisponible. Problème de connexion à Redis.", "danger")
-        return redirect(url_for('accueil'))
-
-    fichiers = request.files.getlist('bulletin_pdf')
+def analyser():
+    fichier = request.files.get('bulletin_pdf')
+    nom_eleve = request.form.get('nom_eleve', '').strip()
     liste_matieres_str = request.form.get('liste_matieres', '')
-    liste_eleves_str = request.form.get('liste_eleves', '')
     matieres_attendues = [m.strip() for m in liste_matieres_str.split(',') if m.strip()]
-    eleves_attendus = [e.strip() for e in liste_eleves_str.split('\n') if e.strip()]
 
-    if not all([fichiers, matieres_attendues, eleves_attendus]):
-        flash("Erreur : Tous les champs sont requis.", "danger")
+    if not all([fichier, nom_eleve, matieres_attendues]):
+        flash("Tous les champs sont requis.", "danger")
         return redirect(url_for('accueil'))
 
-    nombre_a_traiter = len(fichiers)
-    if len(eleves_attendus) < nombre_a_traiter:
-        flash(f"Erreur : Vous avez téléversé {nombre_a_traiter} fichiers pour {len(eleves_attendus)} élèves.", "danger")
-        return redirect(url_for('accueil'))
+    try:
+        pdf_bytes = fichier.read()
+        pdf_file_in_memory = io.BytesIO(pdf_bytes)
+        
+        texte_extrait = ""
+        with pdfplumber.open(pdf_file_in_memory) as pdf:
+            texte_extrait = pdf.pages[0].extract_text(x_tolerance=1, y_tolerance=1) or ""
+        
+        if not texte_extrait:
+            raise ValueError("Le contenu du PDF est vide ou illisible.")
 
-    job_ids = []
-    for i in range(nombre_a_traiter):
-        fichier, nom_eleve = fichiers[i], eleves_attendus[i]
-        if not fichier.filename: continue
-        chemin_fichier = os.path.join(app.config['UPLOAD_FOLDER'], fichier.filename)
-        try:
-            fichier.save(chemin_fichier)
-            with open(chemin_fichier, "rb") as f:
-                pdf_bytes = f.read()
-            job = q.enqueue('tasks.traiter_un_bulletin', args=(pdf_bytes, nom_eleve, matieres_attendues), job_timeout='10m')
-            job_ids.append(job.get_id())
-        except Exception as e:
-            print(f"Erreur lors de la sauvegarde/lecture du fichier {fichier.filename}: {e}")
-            continue
-        finally:
-            if os.path.exists(chemin_fichier): os.remove(chemin_fichier)
+        donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve, matieres_attendues)
+        
+        if not donnees_structurees.get("nom_eleve"):
+            raise ValueError(f"Le nom '{nom_eleve}' n'a pas été trouvé dans le contenu du PDF. Vérifiez l'orthographe ou les variations dans le PDF.")
+        if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
+            raise ValueError(f"Le parser a trouvé {len(donnees_structurees['appreciations_matieres'])} matières au lieu des {len(matieres_attendues)} attendues.")
 
-    if not job_ids:
-        flash("Aucune tâche n'a pu être lancée.", "danger")
-        return redirect(url_for('accueil'))
-    return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
-
-
-@app.route('/suivi/<job_ids>')
-@login_required
-def page_suivi(job_ids):
-    return render_template('suivi.html', job_ids=job_ids.split(','))
-
-@app.route('/statut-jobs', methods=['POST'])
-@login_required
-def statut_jobs():
-    job_ids = request.json.get('job_ids', [])
-    resultats = []
-    for job_id in job_ids:
-        job = q.fetch_job(job_id)
-        resultat_final = None
-        if job:
-            status = job.get_status()
-            if status == 'finished':
-                analyse = Analyse.query.get(job_id)
-                if analyse:
-                    resultat_final = {"status": "succes", "nom_eleve": analyse.nom_eleve, "appreciation_principale": analyse.appreciation_principale, "justifications_html": MisakaMarkdown(analyse.justifications or ""), "donnees": analyse.donnees_brutes}
-            elif status == 'failed':
-                resultat_final = {"status": "echec", "erreur": job.exc_info.strip().split('\n')[-1] if job.exc_info else "Tâche échouée."}
-            if not resultat_final: resultat_final = {}
-            if job.args: resultat_final['nom_eleve'] = job.args[1]
-            resultats.append({"id": job.get_id(), "status": status, "resultat": resultat_final})
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        if not client.api_key: raise ValueError("Clé GROQ_API_KEY non définie.")
+        
+        liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
+        prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique et analytique."
+        prompt_utilisateur = f"""
+        Voici les données de l'élève {nom_eleve}.
+        Données brutes :
+        {liste_appreciations}
+        Ta réponse doit être en DEUX parties, séparées par "--- JUSTIFICATIONS ---".
+        Partie 1: Rédige un paragraphe de 2-3 phrases pour l'appréciation globale.
+        Partie 2: Justifie chaque idée clé avec des citations brutes des commentaires.
+        """
+        
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": prompt_systeme}, {"role": "user", "content": prompt_utilisateur}],
+            model="llama3-70b-8192", temperature=0.5
+        )
+        reponse_complete_ia = chat_completion.choices[0].message.content
+        
+        separateur = "--- JUSTIFICATIONS ---"
+        if separateur in reponse_complete_ia:
+            parties = reponse_complete_ia.split(separateur, 1)
+            appreciation_principale = parties[0].strip()
+            justifications = MisakaMarkdown(parties[1].strip())
         else:
-            resultats.append({"id": job_id, "status": "non_trouve"})
-    return jsonify(resultats)
+            appreciation_principale = reponse_complete_ia
+            justifications = "Pas de justifications fournies."
+        
+        return render_template('resultat.html', res={
+            "nom_eleve": nom_eleve,
+            "donnees": donnees_structurees,
+            "appreciation_principale": appreciation_principale,
+            "justifications_html": justifications
+        })
 
-with app.app_context():
-    db.create_all()
+    except Exception as e:
+        flash(f"Une erreur est survenue : {e}", "danger")
+        return redirect(url_for('accueil'))
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,27 @@
+{% extends "base_simple.html" %}
+{% block content %}
+<h2>Résultat pour : {{ res.nom_eleve }}</h2>
+<a href="{{ url_for('accueil') }}" class="btn btn-secondary mb-3">Retour et nouvelle analyse</a>
+
+<!-- On réutilise la structure d'affichage qu'on avait validée -->
+<div class="card mb-3">
+    <div class="card-header">1. Données Extraites</div>
+    <div class="card-body">
+        <table class="table table-sm">
+            ... <!-- Le tableau des matières -->
+        </table>
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-header">2. Proposition d'Appréciation</div>
+    <div class="card-body">
+        <textarea class="form-control" rows="4">{{ res.appreciation_principale }}</textarea>
+    </div>
+</div>
+<div class="card mb-3">
+    <div class="card-header">3. Justifications</div>
+    <div class="card-body">
+        {{ res.justifications | markdown }}
+    </div>
+</div>
+{% endblock %}
