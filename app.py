@@ -3,7 +3,7 @@ import re
 import pdfplumber
 import unicodedata
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from flask_misaka import markdown as MisakaMarkdown
+from flask_misaka import Misaka # On s'assure que l'import est bien là
 import redis
 from rq import Queue
 from tasks import traiter_un_bulletin
@@ -14,9 +14,10 @@ from flask_bcrypt import Bcrypt
 
 # 1. Initialisation de l'application
 app = Flask(__name__)
+Misaka(app) # <-- LA LIGNE MANQUANTE À RAJOUTER
 
 # 2. Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
 app.config['UPLOAD_FOLDER'] = 'uploads'
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith("postgres://"):
@@ -67,15 +68,12 @@ except Exception as e:
 # 7. Routes de l'application
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('accueil'))
+    if current_user.is_authenticated: return redirect(url_for('accueil'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         ADMIN_USERNAME = os.getenv('APP_USERNAME')
         ADMIN_PASSWORD = os.getenv('APP_PASSWORD')
-        
-        # Simplification de la vérification de mot de passe pour le débogage
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             user = User(id=1)
             login_user(user)
@@ -149,6 +147,7 @@ def lancer_analyse():
         flash("Aucune tâche n'a pu être lancée.", "danger")
         return redirect(url_for('accueil'))
     return redirect(url_for('page_suivi', job_ids=",".join(job_ids)))
+
 
 @app.route('/suivi/<job_ids>')
 @login_required
