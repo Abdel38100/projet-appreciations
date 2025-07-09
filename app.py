@@ -12,35 +12,46 @@ from sqlalchemy.dialects.postgresql import JSONB
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 
-# --- INITIALISATION ET CONFIGURATION (ORDRE IMPORTANT) ---
+# 1. Initialisation
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-par-defaut-pour-le-dev')
+# 2. Configuration
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 db_url = os.getenv('DATABASE_URL')
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# 3. Extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 
-# --- MODÈLES ---
+# 4. Modèle User & Loader
 class User(UserMixin):
-    def __init__(self, id):
+    def __init__(self, id, username, password_hash):
         self.id = id
+        self.username = username
+        self.password_hash = password_hash
+
+# On crée une seule instance de notre utilisateur pour toute l'application
+ADMIN_USERNAME = os.getenv('APP_USERNAME', 'admin')
+ADMIN_PASSWORD_HASH = bcrypt.generate_password_hash(os.getenv('APP_PASSWORD', 'password')).decode('utf-8')
+the_user = User(id=1, username=ADMIN_USERNAME, password_hash=ADMIN_PASSWORD_HASH)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User(user_id)
+    if int(user_id) == the_user.id:
+        return the_user
+    return None
 
+# 5. Modèle de la base de données
 class Analyse(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     nom_eleve = db.Column(db.String(200), nullable=False)
@@ -50,26 +61,24 @@ class Analyse(db.Model):
     donnees_brutes = db.Column(JSONB)
     cree_le = db.Column(db.DateTime, server_default=db.func.now())
 
-# --- CONNEXION REDIS ---
+# 6. Connexion Redis
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
 conn = redis.from_url(redis_url)
 q = Queue(connection=conn)
 
-# --- ROUTES ---
+# 7. Routes de l'application
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('accueil'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        ADMIN_USERNAME = os.getenv('APP_USERNAME', 'admin')
-        ADMIN_PASSWORD = os.getenv('APP_PASSWORD', 'password')
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            user = User(id=1)
-            login_user(user)
+        # On compare le mot de passe fourni avec le hash stocké
+        if username == the_user.username and bcrypt.check_password_hash(the_user.password_hash, password):
+            login_user(the_user)
             return redirect(url_for('accueil'))
         else:
-            flash('Échec de la connexion.', 'danger')
+            flash('Échec de la connexion. Vérifiez vos identifiants.', 'danger')
     return render_template('login.html')
 
 @app.route('/logout')
@@ -83,7 +92,7 @@ def logout():
 def accueil():
     return render_template('accueil.html')
 
-@app.route('/history') # On garde /history car c'est celui qui est dans base.html
+@app.route('/history')
 @login_required
 def history():
     analyses_sauvegardees = Analyse.query.order_by(Analyse.cree_le.desc()).all()
@@ -131,7 +140,8 @@ def lancer_analyse():
 @app.route('/suivi/<job_ids>')
 @login_required
 def page_suivi(job_ids):
-    return render_template('suivi.html', job_ids=job_ids.split(','))
+    id_list = job_ids.split(',')
+    return render_template('suivi.html', job_ids=id_list)
 
 @app.route('/statut-jobs', methods=['POST'])
 @login_required
@@ -156,9 +166,5 @@ def statut_jobs():
             resultats.append({"id": job_id, "status": "non_trouve"})
     return jsonify(resultats)
 
-# --- GESTIONNAIRE DE CONTEXTE ET CRÉATION DES TABLES ---
-# Cette partie s'assure que la base de données est prête
 with app.app_context():
     db.create_all()
-
-# Pas de if __name__ == '__main__' car Gunicorn n'en a pas besoin
