@@ -12,37 +12,40 @@ from parser import analyser_texte_bulletin
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import JSONB
 
-# --- INITIALISATION ET CONFIGURATION ---
+# 1. Initialisation
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 Misaka(app)
 
-# --- CONFIGURATION DE LA BASE DE DONNÉES (CORRIGÉE) ---
+# 2. Configuration de la BDD
 db_url = os.getenv('DATABASE_URL')
-if db_url:
-    # SQLAlchemy préfère 'postgresql://' au lieu de 'postgres://'
-    if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
-else:
-    # Fournit une valeur par défaut pour éviter de planter si la variable n'est pas définie
-    # Cela peut arriver en local ou lors d'un démarrage à froid.
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///local.db'
-    print("ATTENTION: DATABASE_URL non trouvée, utilisation d'une base de données SQLite locale.")
-
+if not db_url:
+    # Cette condition est une sécurité pour le démarrage, mais la commande init-db échouera si la variable n'est pas là
+    print("ATTENTION: DATABASE_URL n'est pas définie. L'initialisation de la BDD peut échouer.")
+    db_url = "postgresql://user:pass@host/db" # Valeur factice
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Initialisation des extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
-login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 
-# --- MODÈLES ---
+# 3. Modèles
+class User(UserMixin):
+    def __init__(self, id): self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id is not None: return User(user_id)
+    return None
+
 class Classe(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     annee_scolaire = db.Column(db.String(10), nullable=False)
@@ -58,15 +61,15 @@ class Analyse(db.Model):
     donnees_brutes = db.Column(JSONB)
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
     
-class User(UserMixin):
-    def __init__(self, id): self.id = id
+# 4. COMMANDE D'INITIALISATION DE LA BDD (LA PARTIE MANQUANTE)
+@app.cli.command("init-db")
+def init_db_command():
+    """Crée les tables de la base de données."""
+    with app.app_context():
+        db.create_all()
+    print("Tables de la base de données créées avec succès.")
 
-@login_manager.user_loader
-def load_user(user_id):
-    if user_id is not None: return User(user_id)
-    return None
-
-# --- ROUTES ---
+# 5. Routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('accueil'))
@@ -90,9 +93,13 @@ def logout():
 @app.route('/')
 @login_required
 def accueil():
-    classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
-    derniere_classe_id = session.get('classe_id')
-    return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
+    try:
+        classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
+        derniere_classe_id = session.get('classe_id')
+        return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
+    except Exception as e:
+        flash("Erreur de connexion à la base de données. Vérifiez qu'elle est bien configurée et initialisée.", "danger")
+        return render_template('accueil.html', classes=[], derniere_classe_id=None)
 
 @app.route('/analyser', methods=['POST'])
 @login_required
@@ -143,7 +150,6 @@ def analyser():
         Rédige un paragraphe de 2 à 3 phrases pour le bulletin.
         **Partie 2 : Justifications**
         Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires.
-        Rédige maintenant ta réponse complète.
         """
         
         chat_completion = client.chat.completions.create(messages=[{"role": "system", "content": prompt_systeme}, {"role": "user", "content": prompt_utilisateur}], model="llama3-70b-8192", temperature=0.5)
@@ -152,19 +158,13 @@ def analyser():
         separateur = "--- JUSTIFICATIONS ---"
         if separateur in reponse_complete_ia:
             parties = reponse_complete_ia.split(separateur, 1)
-            appreciation_principale = parties[0].replace("**Partie 1 : Appréciation Globale**", "").strip()
-            justifications = parties[1].replace("**Partie 2 : Justifications**", "").strip()
+            appreciation_principale = parties[0].strip()
+            justifications = parties[1].strip()
         else:
             appreciation_principale = reponse_complete_ia
             justifications = ""
         
-        nouvelle_analyse = Analyse(
-            nom_eleve=nom_eleve,
-            appreciation_principale=appreciation_principale,
-            justifications=justifications,
-            donnees_brutes=donnees_structurees,
-            classe_id=classe_id
-        )
+        nouvelle_analyse = Analyse(nom_eleve=nom_eleve, appreciation_principale=appreciation_principale, justifications=justifications, donnees_brutes=donnees_structurees, classe_id=classe_id)
         db.session.add(nouvelle_analyse)
         db.session.commit()
         
@@ -178,17 +178,13 @@ def analyser():
 @login_required
 def configuration():
     if request.method == 'POST':
-        annee = request.form.get('annee_scolaire')
-        nom_classe = request.form.get('nom_classe')
-        matieres = request.form.get('matieres')
-        
+        annee, nom_classe, matieres = request.form.get('annee_scolaire'), request.form.get('nom_classe'), request.form.get('matieres')
         if all([annee, nom_classe, matieres]):
             nouvelle_classe = Classe(annee_scolaire=annee, nom_classe=nom_classe, matieres=matieres)
             db.session.add(nouvelle_classe)
             db.session.commit()
             flash("Nouvelle classe ajoutée avec succès !", "success")
-        else:
-            flash("Tous les champs sont requis.", "warning")
+        else: flash("Tous les champs sont requis.", "warning")
         return redirect(url_for('configuration'))
         
     classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
@@ -202,9 +198,6 @@ def supprimer_classe(classe_id):
     db.session.commit()
     flash("La classe et toutes ses analyses ont été supprimées.", "info")
     return redirect(url_for('configuration'))
-    
-#with app.app_context():
-#    db.create_all()
 
 if __name__ == '__main__':
     app.run(debug=True)
