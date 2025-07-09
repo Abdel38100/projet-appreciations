@@ -15,6 +15,7 @@ Flask-Login==0.6.3
 Flask-Misaka==1.0.1
 Flask-SQLAlchemy==3.1.1
 greenlet==3.2.3
+groq==0.29.0
 gunicorn==23.0.0
 h11==0.16.0
 httpcore==1.0.9
@@ -26,7 +27,6 @@ jiter==0.10.0
 Markdown==3.8.2
 MarkupSafe==3.0.2
 misaka==2.1.1
-mistralai==0.4.2
 orjson==3.10.18
 packaging==25.0
 pdfminer.six==20250506

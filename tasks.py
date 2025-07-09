@@ -2,9 +2,8 @@ import os
 import re
 import pdfplumber
 import io
-import time # <-- NOUVEL IMPORT
-from mistralai.client import MistralClient
-from mistralai.models.chat_completion import ChatMessage
+import time
+from groq import Groq # <-- NOUVEL IMPORT
 from parser import analyser_texte_bulletin
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -38,15 +37,14 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         
         donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve_attendu, matieres_attendues)
         
-        if not donnees_structurees.get("nom_eleve"):
-             raise ValueError("Le nom de l'élève n'a pas été trouvé dans le contenu du PDF.")
-        
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues):
-            raise ValueError(f"Le nombre de matières trouvées ({len(donnees_structurees['appreciations_matieres'])}) ne correspond pas au nombre attendu ({len(matieres_attendues)}).")
+            raise ValueError(f"Le nombre de matières trouvées ne correspond pas au nombre attendu.")
 
-        api_key = os.environ.get("MISTRAL_API_KEY")
-        if not api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
-        client = MistralClient(api_key=api_key)
+        # --- APPEL À L'API GROQ ---
+        client = Groq(
+            api_key=os.environ.get("GROQ_API_KEY"),
+        )
+        if not client.api_key: raise ValueError("Clé GROQ_API_KEY non définie.")
         
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
@@ -58,12 +56,21 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
         **Partie 1 : Appréciation Globale**
         Rédige un paragraphe de 2 à 3 phrases pour le bulletin.
         **Partie 2 : Justifications**
-        Sous le séparateur, justifie chaque idée clé de ta synthèse.
+        Sous le séparateur, justifie chaque idée clé de ta synthèse avec des citations brutes.
         Rédige maintenant ta réponse complète.
         """
-        messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
-        chat_response = client.chat(model="mistral-large-latest", messages=messages, temperature=0.5)
-        reponse_complete_ia = chat_response.choices[0].message.content
+        
+        # La syntaxe est presque identique à celle d'OpenAI
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": prompt_systeme},
+                {"role": "user", "content": prompt_utilisateur}
+            ],
+            model="llama3-70b-8192", # Un des modèles les plus puissants disponibles sur Groq
+            temperature=0.5,
+        )
+        
+        reponse_complete_ia = chat_completion.choices[0].message.content
 
         separateur = "--- JUSTIFICATIONS ---"
         if separateur in reponse_complete_ia:
@@ -74,32 +81,20 @@ def traiter_un_bulletin(pdf_bytes, nom_eleve_attendu, matieres_attendues):
             appreciation_principale = reponse_complete_ia
             justifications = "L'IA n'a pas fourni de justifications séparées."
         
+        # Le reste (sauvegarde en BDD) est identique
         db_url = os.getenv('DATABASE_URL')
         if db_url and db_url.startswith("postgres://"):
             db_url = db_url.replace("postgres://", "postgresql://", 1)
-        
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
-        
-        nouvelle_analyse = Analyse(
-            id=job.get_id(),
-            nom_eleve=nom_eleve_attendu,
-            moyenne_generale=donnees_structurees.get("moyenne_generale"),
-            appreciation_principale=appreciation_principale,
-            justifications=justifications,
-            donnees_brutes=donnees_structurees
-        )
+        nouvelle_analyse = Analyse(id=job.get_id(), nom_eleve=nom_eleve_attendu, moyenne_generale=donnees_structurees.get("moyenne_generale"), appreciation_principale=appreciation_principale, justifications=justifications, donnees_brutes=donnees_structurees)
         session.add(nouvelle_analyse)
         session.commit()
         session.close()
 
-        # --- AJOUT DE LA PAUSE ---
-        # On attend 5 secondes pour être "poli" avec l'API de Mistral
-        # et éviter de dépasser la limite de requêtes par minute.
-        print(f"Tâche pour {nom_eleve_attendu} terminée. Pause de 5 secondes...")
-        time.sleep(5)
-        # -------------------------
+        # On enlève la pause, car Groq est très rapide et a un rate limit plus élevé.
+        # time.sleep(5) 
 
     except Exception as e:
         print(f"ERREUR DANS LA TÂCHE pour {nom_eleve_attendu}: {e}")
