@@ -12,18 +12,14 @@ from parser import analyser_texte_bulletin
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.dialects.postgresql import JSONB
 
-# 1. Initialisation
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 Misaka(app)
 
-# 2. Configuration de la BDD
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
-    # Cette condition est une sécurité pour le démarrage, mais la commande init-db échouera si la variable n'est pas là
-    print("ATTENTION: DATABASE_URL n'est pas définie. L'initialisation de la BDD peut échouer.")
-    db_url = "postgresql://user:pass@host/db" # Valeur factice
-if db_url.startswith("postgres://"):
+    print("ATTENTION: DATABASE_URL n'est pas trouvée. L'application va échouer.")
+if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -37,7 +33,6 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# 3. Modèles
 class User(UserMixin):
     def __init__(self, id): self.id = id
 
@@ -60,16 +55,7 @@ class Analyse(db.Model):
     justifications = db.Column(db.Text)
     donnees_brutes = db.Column(JSONB)
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
-    
-# 4. COMMANDE D'INITIALISATION DE LA BDD (LA PARTIE MANQUANTE)
-@app.cli.command("init-db")
-def init_db_command():
-    """Crée les tables de la base de données."""
-    with app.app_context():
-        db.create_all()
-    print("Tables de la base de données créées avec succès.")
 
-# 5. Routes
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('accueil'))
@@ -97,8 +83,8 @@ def accueil():
         classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
         derniere_classe_id = session.get('classe_id')
         return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
-    except Exception as e:
-        flash("Erreur de connexion à la base de données. Vérifiez qu'elle est bien configurée et initialisée.", "danger")
+    except Exception:
+        flash("La base de données n'est pas encore initialisée. Veuillez visiter /init-database-manuellement une seule fois.", "warning")
         return render_template('accueil.html', classes=[], derniere_classe_id=None)
 
 @app.route('/analyser', methods=['POST'])
@@ -180,8 +166,7 @@ def configuration():
     if request.method == 'POST':
         annee, nom_classe, matieres = request.form.get('annee_scolaire'), request.form.get('nom_classe'), request.form.get('matieres')
         if all([annee, nom_classe, matieres]):
-            nouvelle_classe = Classe(annee_scolaire=annee, nom_classe=nom_classe, matieres=matieres)
-            db.session.add(nouvelle_classe)
+            db.session.add(Classe(annee_scolaire=annee, nom_classe=nom_classe, matieres=matieres))
             db.session.commit()
             flash("Nouvelle classe ajoutée avec succès !", "success")
         else: flash("Tous les champs sont requis.", "warning")
@@ -198,6 +183,18 @@ def supprimer_classe(classe_id):
     db.session.commit()
     flash("La classe et toutes ses analyses ont été supprimées.", "info")
     return redirect(url_for('configuration'))
+    
+# --- ROUTE SECRÈTE POUR INITIALISER LA BDD ---
+@app.route('/init-database-manuellement')
+@login_required
+def init_db_manually():
+    try:
+        with app.app_context():
+            db.create_all()
+        flash("La base de données a été initialisée avec succès !", "success")
+    except Exception as e:
+        flash(f"Erreur lors de l'initialisation de la base de données : {e}", "danger")
+    return redirect(url_for('accueil'))
 
 if __name__ == '__main__':
     app.run(debug=True)
