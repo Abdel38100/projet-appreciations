@@ -4,4 +4,6 @@ flask-bcrypt
 gunicorn
 pdfplumber
 groq
+Flask-SQLAlchemy
+psycopg2-binary
 Flask-Misaka
