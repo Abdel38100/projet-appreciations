@@ -4,3 +4,4 @@ flask-bcrypt
 gunicorn
 pdfplumber
 groq
+Flask-Misaka
