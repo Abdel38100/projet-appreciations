@@ -22,15 +22,10 @@ Misaka(app)
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
     db_url = "sqlite:///local_database.db"
-
 if 'sqlite' not in db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
@@ -58,14 +53,11 @@ class Analyse(db.Model):
     nom_eleve = db.Column(db.String(200), nullable=False)
     appreciation_principale = db.Column(db.Text)
     justifications = db.Column(db.Text)
-    donnees_brutes = db.Column(db.JSON) 
+    donnees_brutes = db.Column(db.JSON)
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
 
-@app.cli.command("init-db")
-def init_db_command():
-    with app.app_context():
-        db.create_all()
-    print("Tables de la base de données créées avec succès.")
+with app.app_context():
+    db.create_all()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -87,16 +79,16 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 @login_required
 def accueil():
-    try:
-        classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
-        derniere_classe_id = session.get('classe_id')
-        return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
-    except Exception:
-        flash("Base de données non initialisée. L'admin doit lancer la commande d'initialisation via Render.", "warning")
-        return render_template('accueil.html', classes=[], derniere_classe_id=None)
+    if request.method == 'POST':
+        classe_id = request.form.get('classe_id')
+        session['classe_id'] = classe_id
+        return redirect(url_for('analyser'))
+        
+    classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
+    return render_template('accueil.html', classes=classes, derniere_classe_id=session.get('classe_id'))
 
 @app.route('/analyser', methods=['GET', 'POST'])
 @login_required

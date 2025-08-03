@@ -6,8 +6,9 @@
         <h2>Résultat pour : {{ res.nom_eleve }}</h2>
         <h5 class="text-muted">{{ classe.nom_classe }} - {{ classe.annee_scolaire }}</h5>
     </div>
-    <a href="{{ url_for('analyser') }}" class="btn btn-secondary mb-3">Analyser un autre élève</a>
+    <a href="{{ url_for('analyser') }}" class="btn btn-secondary mb-3">Analyser un autre élève de cette classe</a>
 </div>
+<!-- ... Le reste du contenu (tableau, appréciation, justifications) ne change pas ... -->
 <div class="card mb-3">
     <div class="card-header">1. Données Extraites</div>
     <div class="card-body">

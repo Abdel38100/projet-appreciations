@@ -3,7 +3,7 @@
 {% block content %}
 <div class="card shadow-sm">
     <div class="card-header">
-        <h2>Analyse pour la classe : {{ classe.nom_classe }} ({{ classe.annee_scolaire }})</h2>
+        <h2>Analyse pour la classe : {{ classe.nom_classe }} <small class="text-muted">({{ classe.annee_scolaire }})</small></h2>
     </div>
     <div class="card-body">
         <form action="{{ url_for('analyser') }}" method="post" enctype="multipart/form-data">
