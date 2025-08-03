@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import re
 import pdfplumber
@@ -7,33 +10,34 @@ from flask import Flask, render_template, request, flash, redirect, url_for, ses
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 from flask_misaka import Misaka
-from groq import Groq
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
 from flask_sqlalchemy import SQLAlchemy
 
-# --- INITIALISATION ET CONFIGURATION ---
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'une-cle-secrete-tres-securisee')
 Misaka(app)
 
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
-    # Pour le développement local, on utilise une base SQLite
     db_url = "sqlite:///local_database.db"
     print("ATTENTION: DATABASE_URL non trouvée, utilisation d'une base de données SQLite locale.")
-    
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
 
+if 'sqlite' not in db_url and db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-# --- MODÈLES DE BASE DE DONNÉES ---
 class User(UserMixin):
     def __init__(self, id): self.id = id
 
@@ -47,7 +51,7 @@ class Classe(db.Model):
     annee_scolaire = db.Column(db.String(10), nullable=False)
     nom_classe = db.Column(db.String(50), nullable=False)
     matieres = db.Column(db.Text, nullable=False)
-    eleves = db.Column(db.Text, nullable=False) # Liste des élèves, un par ligne
+    eleves = db.Column(db.Text, nullable=False)
     analyses = db.relationship('Analyse', backref='classe', lazy=True, cascade="all, delete-orphan")
 
 class Analyse(db.Model):
@@ -58,12 +62,15 @@ class Analyse(db.Model):
     donnees_brutes = db.Column(db.JSON)
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
 
-# --- ROUTES ---
+with app.app_context():
+    db.create_all()
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated: return redirect(url_for('accueil'))
     if request.method == 'POST':
-        username, password = request.form.get('username'), request.form.get('password')
+        username = request.form.get('username')
+        password = request.form.get('password')
         if username == os.getenv('APP_USERNAME') and password == os.getenv('APP_PASSWORD'):
             user = User(id=1)
             login_user(user)
@@ -122,14 +129,25 @@ def analyser():
             if not donnees_structurees.get("nom_eleve"): raise ValueError(f"Le nom '{nom_eleve}' n'a pas été trouvé dans le PDF.")
             if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues): raise ValueError(f"Le parser n'a pas trouvé le bon nombre de matières.")
 
-            client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+            client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
+            if not client.api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
             
             liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
             prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
-            prompt_utilisateur = f"Rédige une appréciation pour {nom_eleve} en te basant sur ces données:\n{liste_appreciations}\nTa réponse doit être en DEUX parties, séparées par '--- JUSTIFICATIONS ---'. Partie 1: L'appréciation globale. Partie 2: Les justifications avec citations brutes."
+            prompt_utilisateur = f"""
+            Voici les données de l'élève {nom_eleve}.
+            Données brutes :
+            {liste_appreciations}
+            Ta réponse doit être en DEUX parties distinctes, séparées par "--- JUSTIFICATIONS ---".
+            **Partie 1 : Appréciation Globale**
+            Rédige un paragraphe de 2 à 3 phrases pour le bulletin.
+            **Partie 2 : Justifications**
+            Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires.
+            """
             
-            chat_completion = client.chat.completions.create(messages=[{"role": "system", "content": prompt_systeme}, {"role": "user", "content": prompt_utilisateur}], model="llama3-70b-8192", temperature=0.5)
-            reponse_ia = chat_completion.choices[0].message.content
+            messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
+            chat_response = client.chat(model="mistral-large-latest", messages=messages, temperature=0.5)
+            reponse_ia = chat_response.choices[0].message.content
             
             separateur = "--- JUSTIFICATIONS ---"
             if separateur in reponse_ia:
@@ -141,7 +159,6 @@ def analyser():
             nouvelle_analyse = Analyse(nom_eleve=nom_eleve, appreciation_principale=appreciation_principale, justifications=justifications, donnees_brutes=donnees_structurees, classe_id=classe_id)
             db.session.add(nouvelle_analyse)
             db.session.commit()
-            
             return render_template('resultat.html', res=nouvelle_analyse, classe=classe)
 
         except Exception as e:
@@ -187,8 +204,5 @@ def historique_classe(classe_id):
     classe = Classe.query.get_or_404(classe_id)
     return render_template('historique.html', classe=classe)
     
-with app.app_context():
-    db.create_all()
-
 if __name__ == '__main__':
     app.run(debug=True)

@@ -3,7 +3,7 @@ Flask-Login
 flask-bcrypt
 gunicorn
 pdfplumber
-mistralai==0.4.2  # On garde la version stable
+mistralai==0.4.2
 Flask-SQLAlchemy
 psycopg2-binary
 Flask-Misaka
