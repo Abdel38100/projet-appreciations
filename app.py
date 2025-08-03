@@ -62,8 +62,11 @@ class Analyse(db.Model):
     donnees_brutes = db.Column(db.JSON)
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
 
-with app.app_context():
-    db.create_all()
+@app.cli.command("init-db")
+def init_db_command():
+    with app.app_context():
+        db.create_all()
+    print("Tables de la base de données créées avec succès.")
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -93,8 +96,13 @@ def accueil():
         session['classe_id'] = classe_id
         return redirect(url_for('analyser'))
         
-    classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
-    return render_template('accueil.html', classes=classes, derniere_classe_id=session.get('classe_id'))
+    try:
+        classes = Classe.query.order_by(Classe.annee_scolaire.desc(), Classe.nom_classe).all()
+        derniere_classe_id = session.get('classe_id')
+        return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
+    except Exception:
+        flash("Base de données non initialisée. L'admin doit lancer la commande d'initialisation.", "warning")
+        return render_template('accueil.html', classes=[], derniere_classe_id=None)
 
 @app.route('/analyser', methods=['GET', 'POST'])
 @login_required
