@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Historique pour {{ classe.nom_classe }}{% endblock %}
+{% block content %}
+<h2>Historique des Analyses pour : {{ classe.nom_classe }} ({{ classe.annee_scolaire }})</h2>
+<a href="{{ url_for('analyser') }}" class="btn btn-secondary mb-3">Retour à l'analyse</a>
+
+{% for analyse in classe.analyses | sort(attribute='nom_eleve') %}
+<div class="card mb-3">
+  <div class="card-header"><strong>{{ analyse.nom_eleve }}</strong></div>
+  <div class="card-body">
+    <h5 class="card-title">Appréciation Générale</h5>
+    <p class="card-text bg-light p-2 rounded">{{ analyse.appreciation_principale }}</p>
+    <p>
+      <a class="btn btn-secondary btn-sm" data-bs-toggle="collapse" href="#justifications-{{ analyse.id }}">Voir/Cacher les justifications</a>
+    </p>
+    <div class="collapse" id="justifications-{{ analyse.id }}">
+      <div class="card card-body">
+        {{ analyse.justifications | markdown }}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info">Aucune analyse n'a encore été sauvegardée pour cette classe.</div>
+{% endfor %}
+{% endblock %}

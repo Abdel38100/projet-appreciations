@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Configuration{% endblock %}
+{% block content %}
+<div class="row g-4">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header"><h3>Ajouter / Modifier une classe</h3></div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('configuration') }}">
+                    <div class="mb-3">
+                        <label for="annee_scolaire" class="form-label">Année Scolaire (ex: 2024-2025)</label>
+                        <input type="text" class="form-control" id="annee_scolaire" name="annee_scolaire" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="nom_classe" class="form-label">Nom de la Classe (ex: Seconde 3)</label>
+                        <input type="text" class="form-control" id="nom_classe" name="nom_classe" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="matieres" class="form-label">Liste des matières (séparées par une virgule)</label>
+                        <textarea class="form-control" id="matieres" name="matieres" rows="6" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="eleves" class="form-label">Liste des élèves (NOM Prénom, un par ligne)</label>
+                        <textarea class="form-control" id="eleves" name="eleves" rows="8" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Enregistrer la classe</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <h3>Classes existantes</h3>
+        {% for classe in classes %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">{{ classe.nom_classe }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">{{ classe.annee_scolaire }}</h6>
+                    </div>
+                    <form action="{{ url_for('supprimer_classe', classe_id=classe.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette classe et toutes ses analyses ?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p>Aucune classe n'est configurée pour le moment.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
