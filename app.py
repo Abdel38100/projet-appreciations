@@ -10,7 +10,8 @@ from flask import Flask, render_template, request, flash, redirect, url_for, ses
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
 from flask_misaka import Misaka
-from groq import Groq
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 from parser import analyser_texte_bulletin
 from flask_sqlalchemy import SQLAlchemy
 
@@ -20,7 +21,7 @@ Misaka(app)
 
 db_url = os.getenv('DATABASE_URL')
 if not db_url:
-    raise ValueError("ERREUR: DATABASE_URL non définie. Vérifiez votre fichier .env.")
+    raise ValueError("ERREUR: DATABASE_URL non définie. Vérifiez vos variables d'environnement.")
 
 if 'sqlite' not in db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -56,14 +57,10 @@ class Analyse(db.Model):
     nom_eleve = db.Column(db.String(200), nullable=False)
     appreciation_principale = db.Column(db.Text)
     justifications = db.Column(db.Text)
-    donnees_brutes = db.Column(db.JSON)
+    donnees_brutes = db.Column(db.JSON) 
     classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=False)
 
-@app.cli.command("init-db")
-def init_db_command():
-    with app.app_context():
-        db.create_all()
-    print("Tables de la base de données créées avec succès.")
+# On enlève la commande @app.cli
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -93,7 +90,7 @@ def accueil():
         derniere_classe_id = session.get('classe_id')
         return render_template('accueil.html', classes=classes, derniere_classe_id=derniere_classe_id)
     except Exception:
-        flash("Base de données non initialisée. Lancez 'flask init-db' dans le terminal.", "warning")
+        flash("La base de données n'est pas encore initialisée. Visitez /init-db-manuellement une fois.", "warning")
         return render_template('accueil.html', classes=[], derniere_classe_id=None)
 
 @app.route('/analyser', methods=['POST'])
@@ -127,7 +124,8 @@ def analyser():
         if not donnees_structurees.get("nom_eleve"): raise ValueError(f"Le nom '{nom_eleve}' n'a pas été trouvé.")
         if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues): raise ValueError(f"Le parser n'a pas trouvé le bon nombre de matières.")
 
-        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
+        if not client.api_key: raise ValueError("Clé MISTRAL_API_KEY non définie.")
         
         liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
         prompt_systeme = "Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions."
@@ -142,15 +140,9 @@ def analyser():
         Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires.
         """
         
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": prompt_systeme},
-                {"role": "user", "content": prompt_utilisateur}
-            ],
-            model="llama3-70b-8192",
-            temperature=0.5
-        )
-        reponse_complete_ia = chat_completion.choices[0].message.content
+        messages = [ChatMessage(role="system", content=prompt_systeme), ChatMessage(role="user", content=prompt_utilisateur)]
+        chat_response = client.chat(model="mistral-large-latest", messages=messages, temperature=0.5)
+        reponse_complete_ia = chat_response.choices[0].message.content
         
         separateur = "--- JUSTIFICATIONS ---"
         if separateur in reponse_complete_ia:
@@ -189,6 +181,18 @@ def supprimer_classe(classe_id):
     db.session.delete(classe)
     db.session.commit()
     return redirect(url_for('configuration'))
+
+# --- ROUTE SECRÈTE POUR INITIALISER LA BDD ---
+@app.route('/init-db-manuellement')
+@login_required
+def init_db_manually():
+    try:
+        with app.app_context():
+            db.create_all()
+        flash("La base de données a été initialisée avec succès !", "success")
+    except Exception as e:
+        flash(f"Erreur lors de l'initialisation de la base de données : {e}", "danger")
+    return redirect(url_for('accueil'))
 
 if __name__ == '__main__':
     app.run(debug=True)
