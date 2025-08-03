@@ -6,7 +6,7 @@
         <div class="card shadow-sm">
             <div class="card-header"><h3>Ajouter / Modifier une classe</h3></div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('configuration') }}">
+                <form method="POST" action="{{ url_for('main.configuration') }}">
                     <div class="mb-3">
                         <label for="annee_scolaire" class="form-label">Année Scolaire (ex: 2024-2025)</label>
                         <input type="text" class="form-control" id="annee_scolaire" name="annee_scolaire" required>
@@ -38,7 +38,7 @@
                         <h5 class="card-title">{{ classe.nom_classe }}</h5>
                         <h6 class="card-subtitle mb-2 text-muted">{{ classe.annee_scolaire }}</h6>
                     </div>
-                    <form action="{{ url_for('supprimer_classe', classe_id=classe.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette classe et toutes ses analyses ?');">
+                    <form action="{{ url_for('main.supprimer_classe', classe_id=classe.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette classe et toutes ses analyses ?');">
                         <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
                     </form>
                 </div>

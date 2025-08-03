@@ -6,10 +6,10 @@
     <div class="card-body">
         {% if not classes %}
             <div class="alert alert-warning">
-                Aucune classe n'est configurée. Veuillez commencer par <a href="{{ url_for('configuration') }}" class="alert-link">configurer une classe</a>.
+                Aucune classe n'est configurée. Veuillez commencer par <a href="{{ url_for('main.configuration') }}" class="alert-link">configurer une classe</a>.
             </div>
         {% else %}
-            <form action="{{ url_for('accueil') }}" method="post">
+            <form action="{{ url_for('main.accueil') }}" method="post">
                 <div class="mb-3">
                     <label for="classe_id" class="form-label">Sélectionnez la classe à analyser :</label>
                     <div class="input-group">
@@ -29,7 +29,7 @@
             <h4>Historique par classe</h4>
             <div class="list-group">
                 {% for classe in classes %}
-                    <a href="{{ url_for('historique_classe', classe_id=classe.id) }}" class="list-group-item list-group-item-action">
+                    <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="list-group-item list-group-item-action">
                         {{ classe.annee_scolaire }} - {{ classe.nom_classe }}
                         <span class="badge bg-secondary float-end">{{ classe.analyses|length }} analyse(s)</span>
                     </a>

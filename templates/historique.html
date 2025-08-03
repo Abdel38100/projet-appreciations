@@ -2,7 +2,7 @@
 {% block title %}Historique pour {{ classe.nom_classe }}{% endblock %}
 {% block content %}
 <h2>Historique des Analyses pour : {{ classe.nom_classe }} ({{ classe.annee_scolaire }})</h2>
-<a href="{{ url_for('analyser') }}" class="btn btn-secondary mb-3">Retour à l'analyse</a>
+<a href="{{ url_for('main.analyser') }}" class="btn btn-secondary mb-3">Retour à l'analyse</a>
 
 {% for analyse in classe.analyses | sort(attribute='nom_eleve') %}
 <div class="card mb-3">

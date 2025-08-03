@@ -9,12 +9,12 @@
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('accueil') }}">🚀 Analyseur d'Appréciations</a>
+            <a class="navbar-brand" href="{{ url_for('main.accueil') }}">🚀 Analyseur d'Appréciations</a>
             {% if current_user.is_authenticated %}
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('accueil') }}">Accueil</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('configuration') }}">Configuration</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Déconnexion</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.accueil') }}">Accueil</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.configuration') }}">Configuration</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.logout') }}">Déconnexion</a></li>
             </ul>
             {% endif %}
         </div>

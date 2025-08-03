@@ -6,7 +6,7 @@
         <h2>Analyse pour la classe : {{ classe.nom_classe }} <small class="text-muted">({{ classe.annee_scolaire }})</small></h2>
     </div>
     <div class="card-body">
-        <form action="{{ url_for('analyser') }}" method="post" enctype="multipart/form-data">
+        <form action="{{ url_for('main.analyser') }}" method="post" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="nom_eleve" class="form-label">1. Choisir l'élève à analyser</label>
                 <select class="form-select" id="nom_eleve" name="nom_eleve" required>
@@ -25,7 +25,7 @@
             <button type="submit" class="btn btn-primary">Lancer l'analyse pour cet élève</button>
         </form>
         <hr>
-        <a href="{{ url_for('historique_classe', classe_id=classe.id) }}" class="btn btn-info">Voir l'historique de cette classe</a>
+        <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="btn btn-info">Voir l'historique de cette classe</a>
     </div>
 </div>
 {% endblock %}
