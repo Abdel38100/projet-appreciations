@@ -22,7 +22,8 @@ class Analyse(db.Model):
     appreciation_principale = db.Column(Text)
     justifications = db.Column(Text)
     donnees_brutes = db.Column(db.JSON)
-    classe_id = db.Column(Integer, db.ForeignKey('classe.id'), nullable=False)
+    # CORRECTION : Ajout de la virgule après ForeignKey
+    classe_id = db.Column(Integer, ForeignKey('classe.id'), nullable=False)
     prompt_name = db.Column(String(100))
     provider_name = db.Column(String(50))
     created_at = db.Column(DateTime, server_default=func.now())
