@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user, login_user, logout_user
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
+from groq import Groq
 from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
 
@@ -14,13 +15,18 @@ main = Blueprint('main', __name__)
 
 def get_ai_response(provider, system_prompt, user_prompt):
     """Appelle le bon fournisseur d'IA et retourne la réponse."""
-    # Cette version est simplifiée pour ne gérer que Mistral au début
     if provider.name.lower() == 'mistral':
         client = MistralClient(api_key=provider.api_key)
         messages = [ChatMessage(role="system", content=system_prompt), ChatMessage(role="user", content=user_prompt)]
         chat_response = client.chat(model=provider.model_name, messages=messages, temperature=0.6)
         return chat_response.choices[0].message.content
-    # On laisse la possibilité d'ajouter d'autres fournisseurs plus tard
+    elif provider.name.lower() == 'groq':
+        client = Groq(api_key=provider.api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            model=provider.model_name, temperature=0.5
+        )
+        return chat_completion.choices[0].message.content
     else:
         raise ValueError(f"Fournisseur d'IA '{provider.name}' non supporté.")
 
@@ -288,6 +294,7 @@ def init_db_manually():
         db.drop_all()
         db.create_all()
         
+        # Créer un prompt par défaut
         if not Prompt.query.first():
             default_prompt = Prompt(
                 name="Prompt par Défaut",
@@ -308,6 +315,7 @@ Sous le séparateur, justifie chaque idée clé avec des citations brutes des co
             )
             db.session.add(default_prompt)
         
+        # Créer un fournisseur d'IA par défaut
         if not AIProvider.query.first():
              default_provider = AIProvider(
                 name="Mistral",
