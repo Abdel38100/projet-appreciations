@@ -20,10 +20,11 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     misaka.init_app(app)
 
+    # On importe et on enregistre le "blueprint" qui contient toutes nos routes
     from main import main as main_blueprint
     app.register_blueprint(main_blueprint)
     
-    from models import User
+    from models import User, Prompt # <-- ON IMPORTE PROMPT ICI
     @login_manager.user_loader
     def load_user(user_id):
         if user_id is not None:

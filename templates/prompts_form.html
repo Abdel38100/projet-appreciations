@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{% if prompt %}Modifier Prompt{% else %}Ajouter Prompt{% endif %}{% endblock %}
+{% block content %}
+<h2>{% if prompt %}Modifier le Prompt : {{ prompt.name }}{% else %}Ajouter un nouveau Prompt{% endif %}</h2>
+
+<form method="POST" action="{% if prompt %}{{ url_for('main.edit_prompt', prompt_id=prompt.id) }}{% else %}{{ url_for('main.add_prompt') }}{% endif %}">
+    <div class="mb-3">
+        <label for="name" class="form-label">Nom du Prompt</label>
+        <input type="text" class="form-control" id="name" name="name" value="{{ prompt.name if prompt else '' }}" required>
+    </div>
+    <div class="mb-3">
+        <label for="system_message" class="form-label">Message Système (pour le rôle de l'IA)</label>
+        <textarea class="form-control" id="system_message" name="system_message" rows="3" required>{{ prompt.system_message if prompt else 'Tu es un professeur principal qui rédige l\'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions.' }}</textarea>
+    </div>
+    <div class="mb-3">
+        <label for="user_message_template" class="form-label">Template du Message Utilisateur (contient les variables : {nom_eleve}, {trimestre}, {contexte_trimestre}, {appreciations_precedentes}, {liste_appreciations})</label>
+        <textarea class="form-control" id="user_message_template" name="user_message_template" rows="15" required>{{ prompt.user_message_template if prompt else """Rédige une appréciation pour l'élève {nom_eleve} pour le trimestre {trimestre}.
+Contexte important : {contexte_trimestre}
+
+{appreciations_precedentes}
+
+Voici les données BRUTES du trimestre actuel :
+{liste_appreciations}
+
+Ta réponse doit être en DEUX parties, séparées par "--- JUSTIFICATIONS ---".
+**Partie 1 : Appréciation Globale**
+Rédige un paragraphe de 2 à 3 phrases pour le bulletin en tenant compte de l'évolution de l'élève si des données des trimestres précédents sont disponibles.
+**Partie 2 : Justifications**
+Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires DU TRIMESTRE ACTUEL.""" }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">{% if prompt %}Mettre à jour{% else %}Ajouter{% endif %}</button>
+    <a href="{{ url_for('main.list_prompts') }}" class="btn btn-secondary">Annuler</a>
+</form>
+{% endblock %}
