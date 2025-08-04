@@ -17,6 +17,8 @@ class Classe(db.Model):
 class Analyse(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nom_eleve = db.Column(db.String(200), nullable=False)
+    # NOUVELLE COLONNE POUR LE TRIMESTRE
+    trimestre = db.Column(db.Integer, nullable=False) 
     appreciation_principale = db.Column(db.Text)
     justifications = db.Column(db.Text)
     donnees_brutes = db.Column(db.JSON)

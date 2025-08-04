@@ -4,21 +4,35 @@
 <h2>Historique des Analyses pour : {{ classe.nom_classe }} ({{ classe.annee_scolaire }})</h2>
 <a href="{{ url_for('main.analyser') }}" class="btn btn-secondary mb-3">Retour à l'analyse</a>
 
-{% for analyse in classe.analyses | sort(attribute='nom_eleve') %}
-<div class="card mb-3">
-  <div class="card-header"><strong>{{ analyse.nom_eleve }}</strong></div>
-  <div class="card-body">
-    <h5 class="card-title">Appréciation Générale</h5>
-    <p class="card-text bg-light p-2 rounded">{{ analyse.appreciation_principale }}</p>
-    <p>
-      <a class="btn btn-secondary btn-sm" data-bs-toggle="collapse" href="#justifications-{{ analyse.id }}">Voir/Cacher les justifications</a>
-    </p>
-    <div class="collapse" id="justifications-{{ analyse.id }}">
-      <div class="card card-body">
-        {{ analyse.justifications | markdown }}
-      </div>
+{% for nom_eleve, analyses in analyses_par_eleve.items() %}
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h4 class="mb-0">{{ nom_eleve }}</h4>
     </div>
-  </div>
+    <div class="card-body">
+        <div class="accordion" id="accordion-{{ loop.index }}">
+            {% for analyse in analyses %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading-{{ analyse.id }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ analyse.id }}">
+                        <strong>Trimestre {{ analyse.trimestre }}</strong>
+                    </button>
+                </h2>
+                <div id="collapse-{{ analyse.id }}" class="accordion-collapse collapse" data-bs-parent="#accordion-{{ loop.index }}">
+                    <div class="accordion-body">
+                        <h5>Appréciation Générale</h5>
+                        <p class="card-text bg-light p-3 rounded">{{ analyse.appreciation_principale }}</p>
+                        <hr>
+                        <h5>Justifications</h5>
+                        <div class="bg-light p-3 rounded">
+                            {{ analyse.justifications | markdown }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 {% else %}
 <div class="alert alert-info">Aucune analyse n'a encore été sauvegardée pour cette classe.</div>
