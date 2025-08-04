@@ -103,7 +103,7 @@ def analyser():
                 analyses_t2 = Analyse.query.filter_by(classe_id=classe_id, nom_eleve=nom_eleve, trimestre=2).first()
                 if analyses_t2: appreciations_precedentes += f"Appréciation du Trimestre 2:\n{analyses_t2.appreciation_principale}\n\n"
             
-            contexte_trimestre = "C'est le début de l'année, fixer des objectifs." if trimestre == 1 else "C'est le milieu de l'année, faire le bilan des progrès." if trimestre == 2 else "C'est la fin de l'année, donner des conseils pour la suite."
+            contexte_trimestre = "C'est le début de l'année, l'appréciation doit être encourageante et fixer des objectifs clairs pour les deux trimestres restants." if trimestre == 1 else "C'est le milieu de l'année. L'appréciation doit faire le bilan des progrès par rapport au T1 et motiver pour le dernier trimestre." if trimestre == 2 else "C'est la fin de l'année. L'appréciation doit être un bilan final, tenir compte de l'évolution sur l'année et donner des conseils pour la poursuite d'études."
             liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
             
             prompt_systeme = active_prompt.system_message
@@ -292,6 +292,7 @@ def init_db_manually():
     try:
         db.drop_all()
         db.create_all()
+        
         # Créer un prompt par défaut
         if not Prompt.query.first():
             default_prompt = Prompt(
@@ -301,7 +302,6 @@ def init_db_manually():
 Contexte: {contexte_trimestre}
 
 {appreciations_precedentes}
-
 Voici les données BRUTES du trimestre actuel :
 {liste_appreciations}
 
@@ -313,9 +313,19 @@ Sous le séparateur, justifie chaque idée clé avec des citations brutes des co
                 is_active=True
             )
             db.session.add(default_prompt)
-            db.session.commit()
         
-        flash("La base de données a été réinitialisée avec succès ! Un prompt par défaut a été créé et activé.", "success")
+        # Créer un fournisseur d'IA par défaut
+        if not AIProvider.query.first():
+             default_provider = AIProvider(
+                name="Mistral",
+                api_key=os.getenv("MISTRAL_API_KEY", "CHANGER_CETTE_CLE_DANS_LA_CONFIGURATION"),
+                model_name="mistral-large-latest",
+                is_active=True
+             )
+             db.session.add(default_provider)
+
+        db.session.commit()
+        flash("La base de données a été réinitialisée avec succès ! Un prompt et un fournisseur par défaut ont été créés.", "success")
     except Exception as e:
         flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
     return redirect(url_for('main.accueil'))
