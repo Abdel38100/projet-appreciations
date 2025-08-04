@@ -7,6 +7,8 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from flask_login import login_required, current_user, login_user, logout_user
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
+from groq import Groq
+from openai import OpenAI # <-- NOUVEL IMPORT POUR CHATGPT
 from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
 
@@ -14,14 +16,32 @@ main = Blueprint('main', __name__)
 
 def get_ai_response(provider, system_prompt, user_prompt):
     """Appelle le bon fournisseur d'IA et retourne la réponse."""
-    if provider.name.lower() == 'mistral':
+    provider_name = provider.name.lower()
+
+    if provider_name == 'mistral':
         client = MistralClient(api_key=provider.api_key)
         messages = [ChatMessage(role="system", content=system_prompt), ChatMessage(role="user", content=user_prompt)]
         chat_response = client.chat(model=provider.model_name, messages=messages, temperature=0.6)
         return chat_response.choices[0].message.content
+        
+    elif provider_name == 'groq':
+        client = Groq(api_key=provider.api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            model=provider.model_name, temperature=0.5
+        )
+        return chat_completion.choices[0].message.content
+        
+    elif provider_name == 'openai' or 'gpt' in provider_name: # Pour accepter "OpenAI" ou "ChatGPT"
+        client = OpenAI(api_key=provider.api_key)
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+            model=provider.model_name, temperature=0.5
+        )
+        return chat_completion.choices[0].message.content
+        
     else:
-        # On garde la porte ouverte pour d'autres, comme Groq, si on ajoute la dépendance
-        raise ValueError(f"Fournisseur d'IA '{provider.name}' non supporté dans la version actuelle du code.")
+        raise ValueError(f"Fournisseur d'IA '{provider.name}' non supporté.")
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
