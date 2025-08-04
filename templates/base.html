@@ -12,28 +12,31 @@
             <a class="navbar-brand" href="{{ url_for('main.accueil') }}">🚀 Analyseur d'Appréciations</a>
             
             {% if current_user.is_authenticated %}
-            <div class="collapse navbar-collapse">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'main.accueil' %}active{% endif %}" href="{{ url_for('main.accueil') }}">Accueil</a>
+                        <a class="nav-link" href="{{ url_for('main.accueil') }}">Accueil</a>
                     </li>
                     
-                    <!-- NOUVEAU LIEN CONDITIONNEL POUR L'ANALYSE -->
+                    <!-- LIEN CONDITIONNEL POUR L'ANALYSE (S'affiche si une classe est sélectionnée) -->
                     {% if session.get('classe_id') %}
                     <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'main.analyser' %}active{% endif %}" href="{{ url_for('main.analyser') }}">Analyser la Classe</a>
+                        <a class="nav-link" href="{{ url_for('main.analyser') }}">Analyser la Classe</a>
                     </li>
                     {% endif %}
                     
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.endpoint in ['main.configuration', 'main.list_prompts', 'main.list_providers'] %}active{% endif %}" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          Configuration
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="navbarDropdown">
-                          <li><a class="dropdown-item" href="{{ url_for('main.configuration') }}">Classes</a></li>
-                          <li><a class="dropdown-item" href="{{ url_for('main.list_prompts') }}">Prompts IA</a></li>
-                          <li><a class="dropdown-item" href="{{ url_for('main.list_providers') }}">Fournisseurs IA</a></li>
-                        </ul>
+                    <!-- LIENS SIMPLES AU LIEU D'UN MENU DÉROULANT -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.configuration') }}">Classes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.list_prompts') }}">Prompts IA</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.list_providers') }}">Fournisseurs IA</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('main.logout') }}">Déconnexion</a>
@@ -48,7 +51,7 @@
             {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
+                        {{ message | safe }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 {% endfor %}
