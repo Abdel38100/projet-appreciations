@@ -340,3 +340,4 @@ Sous le séparateur, justifie chaque idée clé avec des citations brutes des co
     except Exception as e:
         flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
     return redirect(url_for('main.accueil'))
+
