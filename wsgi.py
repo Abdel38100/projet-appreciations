@@ -1,9 +1,5 @@
-from app import create_app, db
-from models import Classe, Analyse
+from app import create_app
 
+# Cette ligne crée l'application en utilisant notre "factory".
+# C'est ce que Gunicorn va chercher et lancer.
 app = create_app()
-
-# Cette commande est nécessaire pour pouvoir lancer 'flask init-db'
-@app.shell_context_processor
-def make_shell_context():
-    return {'db': db, 'Classe': Classe, 'Analyse': Analyse}
