@@ -1,6 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func
 
 db = SQLAlchemy()
@@ -33,3 +32,10 @@ class Prompt(db.Model):
     is_active = db.Column(Boolean, default=False, nullable=False)
     created_at = db.Column(DateTime, server_default=func.now())
     updated_at = db.Column(DateTime, onupdate=func.now())
+
+class AIProvider(db.Model):
+    id = db.Column(Integer, primary_key=True)
+    name = db.Column(String(50), unique=True, nullable=False)
+    api_key = db.Column(String(200), nullable=False)
+    model_name = db.Column(String(100), nullable=False)
+    is_active = db.Column(Boolean, default=False, nullable=False)

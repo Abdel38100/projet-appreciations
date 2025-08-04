@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{% if provider %}Modifier Fournisseur{% else %}Ajouter Fournisseur{% endif %}{% endblock %}
+{% block content %}
+<h2>{% if provider %}Modifier le Fournisseur : {{ provider.name }}{% else %}Ajouter un nouveau Fournisseur d'IA{% endif %}</h2>
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label for="name" class="form-label">Nom du Fournisseur (ex: Mistral, Groq)</label>
+                <input type="text" class="form-control" id="name" name="name" value="{{ provider.name if provider else '' }}" required>
+            </div>
+            <div class="mb-3">
+                <label for="api_key" class="form-label">Clé API</label>
+                <input type="password" class="form-control" id="api_key" name="api_key" placeholder="Laisser vide pour ne pas changer">
+                <div class="form-text">La clé existante n'est pas affichée pour des raisons de sécurité. Entrez une nouvelle clé pour la mettre à jour.</div>
+            </div>
+            <div class="mb-3">
+                <label for="model_name" class="form-label">Nom du Modèle (ex: mistral-large-latest, llama3-70b-8192)</label>
+                <input type="text" class="form-control" id="model_name" name="model_name" value="{{ provider.model_name if provider else '' }}" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+            <a href="{{ url_for('main.list_providers') }}" class="btn btn-secondary">Annuler</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

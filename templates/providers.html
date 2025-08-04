@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Gestion des Fournisseurs IA{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Gestion des Fournisseurs d'IA</h2>
+    <a href="{{ url_for('main.add_provider') }}" class="btn btn-primary">Ajouter un Fournisseur</a>
+</div>
+<p>Ajoutez et gérez les services d'IA (Mistral, Groq, etc.). Un seul fournisseur peut être actif à la fois.</p>
+
+{% for provider in providers %}
+<div class="card mb-3 {% if provider.is_active %}border-success{% endif %}">
+    <div class="card-body d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="card-title">{{ provider.name }} {% if provider.is_active %}<span class="badge bg-success">Actif</span>{% endif %}</h5>
+            <p class="card-text mb-0"><small class="text-muted">Modèle : {{ provider.model_name }}</small></p>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('main.edit_provider', provider_id=provider.id) }}" class="btn btn-sm btn-secondary">Modifier</a>
+            {% if not provider.is_active %}
+            <form action="{{ url_for('main.set_active_provider', provider_id=provider.id) }}" method="POST" class="d-inline-block ms-1">
+                <button type="submit" class="btn btn-sm btn-success">Activer</button>
+            </form>
+            <form action="{{ url_for('main.delete_provider', provider_id=provider.id) }}" method="POST" onsubmit="return confirm('Voulez-vous supprimer ce fournisseur ?');" class="d-inline-block ms-1">
+                <button type="submit" class="btn btn-sm btn-danger">Supprimer</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

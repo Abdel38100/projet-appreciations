@@ -13,8 +13,9 @@
             {% if current_user.is_authenticated %}
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('main.accueil') }}">Accueil</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.configuration') }}">Configuration</a></li>
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.list_prompts') }}">Prompts IA</a></li> {# NOUVEAU LIEN #}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.configuration') }}">Classes</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.list_prompts') }}">Prompts IA</a></li>
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('main.list_providers') }}">Fournisseurs IA</a></li>
                 <li class="nav-item"><a class="nav-link" href="{{ url_for('main.logout') }}">Déconnexion</a></li>
             </ul>
             {% endif %}
