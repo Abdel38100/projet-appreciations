@@ -4,9 +4,9 @@ flask-bcrypt
 gunicorn
 pdfplumber
 mistralai==0.4.2
+groq
+openai
 Flask-SQLAlchemy
 psycopg2-binary
 Flask-Misaka
 python-dotenv
-groq
-openai

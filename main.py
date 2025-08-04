@@ -15,12 +15,15 @@ from models import db, Classe, Analyse, User, Prompt, AIProvider
 main = Blueprint('main', __name__)
 
 def get_ai_response(provider, system_prompt, user_prompt):
+    """Appelle le bon fournisseur d'IA et retourne la réponse."""
     provider_name = provider.name.lower()
+
     if provider_name == 'mistral':
         client = MistralClient(api_key=provider.api_key)
         messages = [ChatMessage(role="system", content=system_prompt), ChatMessage(role="user", content=user_prompt)]
         chat_response = client.chat(model=provider.model_name, messages=messages, temperature=0.6)
         return chat_response.choices[0].message.content
+        
     elif provider_name == 'groq':
         client = Groq(api_key=provider.api_key)
         chat_completion = client.chat.completions.create(
@@ -28,6 +31,7 @@ def get_ai_response(provider, system_prompt, user_prompt):
             model=provider.model_name, temperature=0.5
         )
         return chat_completion.choices[0].message.content
+        
     elif provider_name == 'openai':
         client = OpenAI(api_key=provider.api_key)
         chat_completion = client.chat.completions.create(
@@ -35,6 +39,7 @@ def get_ai_response(provider, system_prompt, user_prompt):
             model=provider.model_name, temperature=0.5
         )
         return chat_completion.choices[0].message.content
+        
     else:
         raise ValueError(f"Fournisseur d'IA '{provider.name}' non supporté.")
 

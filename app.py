@@ -23,7 +23,7 @@ def create_app(config_class=Config):
     from main import main as main_blueprint
     app.register_blueprint(main_blueprint)
     
-    from models import User, Prompt, AIProvider # On importe les modèles ici
+    from models import User
     @login_manager.user_loader
     def load_user(user_id):
         if user_id is not None:
