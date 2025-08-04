@@ -23,6 +23,10 @@ class Analyse(db.Model):
     justifications = db.Column(Text)
     donnees_brutes = db.Column(db.JSON)
     classe_id = db.Column(Integer, db.ForeignKey('classe.id'), nullable=False)
+    # NOUVEAUX CHAMPS POUR LE SUIVI
+    prompt_name = db.Column(String(100))
+    provider_name = db.Column(String(50))
+    created_at = db.Column(DateTime, server_default=func.now()) # Pour un tri chronologique
 
 class Prompt(db.Model):
     id = db.Column(Integer, primary_key=True)
@@ -30,8 +34,6 @@ class Prompt(db.Model):
     system_message = db.Column(Text, nullable=False)
     user_message_template = db.Column(Text, nullable=False)
     is_active = db.Column(Boolean, default=False, nullable=False)
-    created_at = db.Column(DateTime, server_default=func.now())
-    updated_at = db.Column(DateTime, onupdate=func.now())
 
 class AIProvider(db.Model):
     id = db.Column(Integer, primary_key=True)

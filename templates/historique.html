@@ -10,28 +10,33 @@
         <h4 class="mb-0">{{ nom_eleve }}</h4>
     </div>
     <div class="card-body">
-        <div class="accordion" id="accordion-{{ loop.index }}">
-            {% for analyse in analyses %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading-{{ analyse.id }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ analyse.id }}">
-                        <strong>Trimestre {{ analyse.trimestre }}</strong>
-                    </button>
-                </h2>
-                <div id="collapse-{{ analyse.id }}" class="accordion-collapse collapse" data-bs-parent="#accordion-{{ loop.index }}">
-                    <div class="accordion-body">
-                        <h5>Appréciation Générale</h5>
-                        <p class="card-text bg-light p-3 rounded">{{ analyse.appreciation_principale }}</p>
-                        <hr>
-                        <h5>Justifications</h5>
-                        <div class="bg-light p-3 rounded">
-                            {{ analyse.justifications | markdown }}
-                        </div>
-                    </div>
+        {% for analyse in analyses %}
+        <div class="border p-3 mb-3 rounded">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h5 class="mb-1">Trimestre {{ analyse.trimestre }}</h5>
+                    <small class="text-muted">
+                        Généré le {{ analyse.created_at.strftime('%d/%m/%Y à %H:%M') }} 
+                        avec {{ analyse.provider_name }} (Prompt: {{ analyse.prompt_name }})
+                    </small>
                 </div>
+                <form action="{{ url_for('main.supprimer_analyse', analyse_id=analyse.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette version de l\'appréciation ?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+                </form>
             </div>
-            {% endfor %}
+            <hr>
+            <h6>Appréciation Générale :</h6>
+            <p class="card-text bg-light p-2 rounded">{{ analyse.appreciation_principale }}</p>
+            <p>
+              <a class="btn btn-secondary btn-sm" data-bs-toggle="collapse" href="#justifications-{{ analyse.id }}">Voir/Cacher les justifications</a>
+            </p>
+            <div class="collapse" id="justifications-{{ analyse.id }}">
+              <div class="card card-body">
+                {{ analyse.justifications | markdown }}
+              </div>
+            </div>
         </div>
+        {% endfor %}
     </div>
 </div>
 {% else %}

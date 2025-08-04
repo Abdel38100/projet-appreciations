@@ -8,7 +8,6 @@ from flask_login import login_required, current_user, login_user, logout_user
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 from groq import Groq
-from openai import OpenAI # <-- NOUVEL IMPORT POUR CHATGPT
 from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
 
@@ -32,7 +31,8 @@ def get_ai_response(provider, system_prompt, user_prompt):
         )
         return chat_completion.choices[0].message.content
         
-    elif provider_name == 'openai' or 'gpt' in provider_name: # Pour accepter "OpenAI" ou "ChatGPT"
+    elif provider_name == 'openai':
+        from openai import OpenAI
         client = OpenAI(api_key=provider.api_key)
         chat_completion = client.chat.completions.create(
             messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
@@ -135,22 +135,16 @@ def analyser():
             else:
                 appreciation, justifications = reponse_ia, ""
             
-            analyse_existante = Analyse.query.filter_by(classe_id=classe_id, nom_eleve=nom_eleve, trimestre=trimestre).first()
-            if analyse_existante:
-                analyse_existante.appreciation_principale, analyse_existante.justifications, analyse_existante.donnees_brutes = appreciation, justifications, donnees_structurees
-                analyse_a_afficher = analyse_existante
-            else:
-                nouvelle_analyse = Analyse(nom_eleve=nom_eleve, trimestre=trimestre, appreciation_principale=appreciation, justifications=justifications, donnees_brutes=donnees_structurees, classe_id=classe_id)
-                db.session.add(nouvelle_analyse)
-                analyse_a_afficher = nouvelle_analyse
+            nouvelle_analyse = Analyse(nom_eleve=nom_eleve, trimestre=trimestre, appreciation_principale=appreciation, justifications=justifications, donnees_brutes=donnees_structurees, classe_id=classe_id, prompt_name=active_prompt.name, provider_name=active_provider.name)
+            db.session.add(nouvelle_analyse)
             db.session.commit()
-            return render_template('resultat.html', res=analyse_a_afficher, classe=classe)
+            return render_template('resultat.html', res=nouvelle_analyse, classe=classe)
         except Exception as e:
             flash(f"Une erreur est survenue : {e}", "danger")
             return redirect(url_for('main.analyser'))
     
     analyses_faites = {}
-    for analyse in Classe.query.get(classe_id).analyses:
+    for analyse in classe.analyses:
         if analyse.nom_eleve not in analyses_faites: analyses_faites[analyse.nom_eleve] = set()
         analyses_faites[analyse.nom_eleve].add(analyse.trimestre)
     return render_template('analyser.html', classe=classe, eleves_liste=eleves_liste, analyses_faites=analyses_faites)
@@ -183,7 +177,7 @@ def historique_classe(classe_id):
     analyses_par_eleve = {}
     eleves_tries = sorted(list(set(a.nom_eleve for a in classe.analyses)))
     for nom_eleve in eleves_tries:
-        analyses_par_eleve[nom_eleve] = sorted([a for a in classe.analyses if a.nom_eleve == nom_eleve], key=lambda x: x.trimestre)
+        analyses_par_eleve[nom_eleve] = sorted([a for a in classe.analyses if a.nom_eleve == nom_eleve], key=lambda x: (x.trimestre, x.created_at))
     return render_template('historique.html', classe=classe, analyses_par_eleve=analyses_par_eleve)
 
 @main.route('/prompts')
@@ -299,6 +293,15 @@ def delete_provider(provider_id):
         db.session.commit()
         flash(f"Fournisseur '{provider.name}' supprimé !", "info")
     return redirect(url_for('main.list_providers'))
+    
+@main.route('/analyse/supprimer/<int:analyse_id>', methods=['POST'])
+@login_required
+def supprimer_analyse(analyse_id):
+    analyse = Analyse.query.get_or_404(analyse_id)
+    classe_id = analyse.classe_id
+    db.session.delete(analyse)
+    db.session.commit()
+    return redirect(url_for('main.historique_classe', classe_id=classe_id))
 
 @main.route('/init-db-manuellement')
 @login_required
