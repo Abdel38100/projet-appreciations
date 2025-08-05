@@ -24,41 +24,26 @@
             width: 100%;
             margin: 0 auto;
         }
-        /* --- OPTIMISATION DU TITRE --- */
+        
+        /* --- NOUVEAU STYLE POUR LE TITRE DYNAMIQUE --- */
         h1 {
             font-family: 'Merriweather', serif;
-            font-size: 14pt; /* Police réduite */
+            font-size: 13pt; /* Taille adaptée au titre plus long */
             color: #1e293b;
-            text-align: center;
-            border-bottom: 1px solid #aab8c2; /* Ligne plus fine et discrète */
-            padding-bottom: 5px; /* Espacement interne réduit */
-            margin-bottom: 15px; /* Marge externe réduite */
+            text-align: left; /* Titre aligné à gauche */
+            border-bottom: 1px solid #aab8c2;
+            padding-bottom: 8px;
+            margin-bottom: 25px; /* Marge inférieure pour séparer du contenu */
         }
-        /* --- OPTIMISATION DU TABLEAU D'INFO --- */
-        .info-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px; /* Marge externe réduite */
-        }
-        .info-table td {
-            padding: 4px 6px; /* Espacement interne des cellules réduit */
-            border: 1px solid #e2e8f0;
-            font-size: 9pt; /* Police du tableau réduite */
-        }
-        .info-table .label {
-            font-weight: bold;
-            background-color: #f1f5f9;
-            width: 20%;
-        }
-        /* --- OPTIMISATION DES TITRES DE SECTION --- */
+
         .section-title {
             font-family: 'Merriweather', serif;
-            font-size: 11pt; /* Police réduite */
+            font-size: 11pt;
             color: #3b82f6;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 3px; /* Espacement interne réduit */
-            margin-top: 15px; /* Marge supérieure FORTEMENT réduite */
-            margin-bottom: 8px; /* Marge inférieure réduite */
+            padding-bottom: 3px;
+            margin-top: 15px;
+            margin-bottom: 8px;
         }
         .content {
             background-color: #f8fafc;
@@ -89,22 +74,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>Appréciation Trimestrielle</h1>
-
-        <table class="info-table">
-            <tr>
-                <td class="label">Élève</td>
-                <td>{{ analyse.nom_eleve }}</td>
-            </tr>
-            <tr>
-                <td class="label">Classe</td>
-                <td>{{ classe.nom_classe }} ({{ classe.annee_scolaire }})</td>
-            </tr>
-            <tr>
-                <td class="label">Trimestre</td>
-                <td>{{ analyse.trimestre }}</td>
-            </tr>
-        </table>
+        <!-- MODIFICATION CLÉ : Le titre est maintenant dynamique et le tableau est supprimé -->
+        <h1>{{ classe.nom_classe }} ({{ classe.annee_scolaire }}): Appréciation du <strong>trimestre {{ analyse.trimestre }}</strong> de <strong>{{ analyse.nom_eleve }}</strong></h1>
 
         <div class="section-title">Appréciation Générale du Conseil de Classe</div>
         <div class="content">
