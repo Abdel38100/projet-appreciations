@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <title>Appréciations {{ classe.nom_classe }} - T{{ trimestre }}</title>
     <style>
-        /* --- OPTIMISATIONS DE LA PAGE --- */
         @page {
-            /* Réduction drastique des marges de la page */
             margin-top: 1.5cm;
             margin-bottom: 1.5cm;
             margin-left: 1cm;
@@ -18,13 +16,13 @@
 
         body {
             font-family: 'Roboto', sans-serif;
-            font-size: 10pt; /* Police de base réduite */
+            font-size: 10pt;
             line-height: 1.4;
             color: #333;
         }
         .student-page {
             page-break-after: always;
-            width: 100%; /* Utilise toute la largeur disponible après marges */
+            width: 100%;
             margin: 0 auto;
         }
         .student-page:last-child {
@@ -32,50 +30,61 @@
         }
         h1 {
             font-family: 'Merriweather', serif;
-            font-size: 16pt; /* Taille du titre principal réduite */
+            font-size: 16pt;
             color: #1e293b;
             text-align: center;
             border-bottom: 2px solid #3b82f6;
-            padding-bottom: 8px; /* Espacement réduit */
-            margin-bottom: 20px; /* Espacement réduit */
+            padding-bottom: 8px;
+            margin-bottom: 20px;
         }
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px; /* Espacement réduit */
+            margin-bottom: 20px;
         }
         .info-table td {
-            padding: 5px 8px; /* Espacement interne réduit */
+            padding: 5px 8px;
             border: 1px solid #e2e8f0;
         }
         .info-table .label {
             font-weight: bold;
             background-color: #f1f5f9;
-            width: 20%; /* Largeur de la colonne label réduite */
+            width: 20%;
         }
         .section-title {
             font-family: 'Merriweather', serif;
-            font-size: 12pt; /* Taille des titres de section réduite */
+            font-size: 12pt;
             color: #3b82f6;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 4px; /* Espacement réduit */
-            margin-top: 20px; /* Espacement réduit */
-            margin-bottom: 10px; /* Espacement réduit */
+            padding-bottom: 4px;
+            margin-top: 20px;
+            margin-bottom: 10px;
         }
         .content {
             background-color: #f8fafc;
             border-left: 3px solid #3b82f6;
-            padding: 10px; /* Espacement interne réduit */
+            padding: 10px;
             white-space: pre-wrap;
             font-family: 'Merriweather', serif;
         }
         
-        /* --- NOUVEAU : Style pour les justifications --- */
         .justifications {
-            font-size: 9pt; /* Police encore plus petite pour les détails */
+            font-size: 9pt;
             color: #475569;
-            font-family: 'Roboto', sans-serif; /* Police plus neutre pour les justifications */
-            white-space: normal; /* Permet au texte de s'écouler normalement */
+            font-family: 'Roboto', sans-serif;
+            white-space: normal;
+        }
+        
+        /* NOUVEAUX STYLES POUR FORMATER LES LISTES MARKDOWN */
+        .justifications ul, .justifications ol {
+            padding-left: 20px; /* Ajoute une indentation à la liste */
+            margin: 5px 0;
+        }
+        .justifications li {
+            margin-bottom: 8px; /* Espace entre chaque point de la liste */
+        }
+        .justifications strong, .justifications b {
+            color: #1e293b; /* Met en évidence les titres des points */
         }
     </style>
 </head>
@@ -104,12 +113,13 @@
             {{ analyse.appreciation_principale }}
         </div>
 
-        <!-- NOUVEAU : Ajout de la section Justifications -->
         {% if analyse.justifications %}
         <div class="section-title">Justifications</div>
         <div class="content justifications">
-            <!-- On nettoie les caractères Markdown pour une meilleure lisibilité sur le PDF -->
-            {{ analyse.justifications | replace('**', '') | replace('*', '') }}
+            <!-- MODIFICATION CLÉ : On utilise le filtre 'markdown' et 'safe' -->
+            <!-- 'markdown' convertit le texte en HTML (listes, etc.) -->
+            <!-- 'safe' indique à Jinja2 de ne pas échapper les balises HTML générées -->
+            {{ analyse.justifications | markdown | safe }}
         </div>
         {% endif %}
 

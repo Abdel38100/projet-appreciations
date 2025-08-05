@@ -4,60 +4,84 @@
     <meta charset="utf-8">
     <title>Appréciation de {{ analyse.nom_eleve }}</title>
     <style>
+        /* --- OPTIMISATIONS DE LA PAGE (identiques au PDF de classe) --- */
+        @page {
+            margin-top: 1.5cm;
+            margin-bottom: 1.5cm;
+            margin-left: 1cm;
+            margin-right: 1cm;
+        }
+
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
         body {
             font-family: 'Roboto', sans-serif;
-            font-size: 11pt;
-            line-height: 1.5;
+            font-size: 10pt; /* Police de base réduite */
+            line-height: 1.4;
             color: #333;
         }
         .container {
-            width: 90%;
+            width: 100%; /* Utilise toute la largeur disponible après marges */
             margin: 0 auto;
         }
         h1 {
             font-family: 'Merriweather', serif;
+            font-size: 16pt; /* Taille du titre principal réduite */
             color: #1e293b;
             text-align: center;
             border-bottom: 2px solid #3b82f6;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
+            padding-bottom: 8px; /* Espacement réduit */
+            margin-bottom: 20px; /* Espacement réduit */
         }
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            margin-bottom: 20px; /* Espacement réduit */
         }
         .info-table td {
-            padding: 8px;
+            padding: 5px 8px; /* Espacement interne réduit */
             border: 1px solid #e2e8f0;
         }
         .info-table .label {
             font-weight: bold;
             background-color: #f1f5f9;
-            width: 25%;
+            width: 20%; /* Largeur de la colonne label réduite */
         }
         .section-title {
             font-family: 'Merriweather', serif;
-            font-size: 14pt;
+            font-size: 12pt; /* Taille des titres de section réduite */
             color: #3b82f6;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 5px;
-            margin-top: 30px;
-            margin-bottom: 15px;
+            padding-bottom: 4px; /* Espacement réduit */
+            margin-top: 20px; /* Espacement réduit */
+            margin-bottom: 10px; /* Espacement réduit */
         }
         .content {
             background-color: #f8fafc;
-            border-left: 4px solid #3b82f6;
-            padding: 15px;
-            white-space: pre-wrap; /* Conserve les sauts de ligne de l'appréciation */
+            border-left: 3px solid #3b82f6;
+            padding: 10px; /* Espacement interne réduit */
+            white-space: pre-wrap;
             font-family: 'Merriweather', serif;
         }
+        
         .justifications {
-            font-size: 10pt;
+            font-size: 9pt; /* Police encore plus petite pour les détails */
             color: #475569;
+            font-family: 'Roboto', sans-serif; /* Police plus neutre pour les justifications */
+            white-space: normal;
+        }
+        
+        /* STYLES POUR FORMATER LES LISTES MARKDOWN */
+        .justifications ul, .justifications ol {
+            padding-left: 20px; /* Ajoute une indentation à la liste */
+            margin: 5px 0;
+        }
+        .justifications li {
+            margin-bottom: 8px; /* Espace entre chaque point de la liste */
+        }
+        .justifications strong, .justifications b {
+            color: #1e293b; /* Met en évidence les titres des points */
         }
     </style>
 </head>
@@ -86,9 +110,10 @@
         </div>
 
         {% if analyse.justifications %}
-        <div class="section-title">Justifications de l'appréciation</div>
+        <div class="section-title">Justifications</div>
         <div class="content justifications">
-            {{ analyse.justifications | replace('**', '') | replace('*', '') }}
+            <!-- MODIFICATION CLÉ : On utilise le filtre 'markdown' et 'safe' -->
+            {{ analyse.justifications | markdown | safe }}
         </div>
         {% endif %}
 
