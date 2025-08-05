@@ -34,6 +34,8 @@ class Prompt(db.Model):
     system_message = db.Column(Text, nullable=False)
     user_message_template = db.Column(Text, nullable=False)
     is_active = db.Column(Boolean, default=False, nullable=False)
+    # LIGNE À AJOUTER
+    created_at = db.Column(DateTime, server_default=func.now())
 
 class AIProvider(db.Model):
     id = db.Column(Integer, primary_key=True)
