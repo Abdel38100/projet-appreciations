@@ -189,6 +189,18 @@ def historique_classe(classe_id):
         trimestres_disponibles=trimestres_disponibles  # On passe la nouvelle variable
     )
 
+@main.route('/historique')
+@login_required
+def historique_global():
+    """Affiche la liste de toutes les classes ayant au moins une analyse."""
+    # On récupère uniquement les classes qui ont des analyses associées
+    # pour ne pas afficher de classes vides sur cette page.
+    classes_avec_analyses = Classe.query.filter(Classe.analyses.any()).order_by(
+        Classe.annee_scolaire.desc(), Classe.nom_classe
+    ).all()
+    
+    return render_template('historique_global.html', classes=classes_avec_analyses)
+
 @main.route('/prompts')
 @login_required
 def list_prompts():
