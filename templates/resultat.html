@@ -1,41 +1,80 @@
 {% extends "base.html" %}
 {% block title %}Résultat pour {{ res.nom_eleve }}{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center">
+<div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h2>Résultat pour : {{ res.nom_eleve }}</h2>
+        <h2><i class="fas fa-poll-h me-2"></i>Résultat pour : {{ res.nom_eleve }}</h2>
         <h5 class="text-muted">{{ classe.nom_classe }} - {{ classe.annee_scolaire }}</h5>
     </div>
-    <a href="{{ url_for('main.analyser') }}" class="btn btn-secondary mb-3">Analyser un autre élève de cette classe</a>
+    <a href="{{ url_for('main.analyser') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Analyser un autre élève</a>
 </div>
-<!-- ... Le reste du contenu (tableau, appréciation, justifications) ne change pas ... -->
+
+<!-- 1. Données Extraites -->
 <div class="card mb-3">
-    <div class="card-header">1. Données Extraites</div>
+    <div class="card-header"><i class="fas fa-table me-2"></i>1. Données Extraites</div>
     <div class="card-body">
-        <table class="table table-sm table-bordered">
-            <thead><tr><th>Matière</th><th>Moyenne</th><th>Appréciation</th></tr></thead>
-            <tbody>
-            {% for item in res.donnees_brutes.appreciations_matieres %}
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead><tr><th>Matière</th><th>Moyenne</th><th>Appréciation</th></tr></thead>
+                <tbody>
+                {% for item in res.donnees_brutes.appreciations_matieres %}
                 <tr>
                     <td>{{ item.matiere }}</td>
                     <td>{{ item.moyenne }}</td>
                     <td>{{ item.commentaire }}</td>
                 </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<!-- 2. Proposition d'Appréciation (MODIFIÉE AVEC BOUTON) -->
 <div class="card mb-3">
-    <div class="card-header">2. Proposition d'Appréciation</div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-magic me-2"></i>2. Proposition d'Appréciation</span>
+        <!-- BOUTON POUR OUVRIR LA MODALE D'ÉDITION -->
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editResultModal">
+            <i class="fas fa-pencil-alt me-1"></i> Modifier
+        </button>
+    </div>
     <div class="card-body">
-        <textarea class="form-control" rows="5">{{ res.appreciation_principale }}</textarea>
+        <!-- L'appréciation est maintenant affichée en lecture seule, modifiable via la modale -->
+        <p class="card-text bg-body-tertiary p-3 rounded-3">{{ res.appreciation_principale }}</p>
     </div>
 </div>
+
+<!-- 3. Justifications de l'IA -->
 <div class="card mb-3">
-    <div class="card-header">3. Justifications de l'IA</div>
-    <div class="card-body bg-light">
-        {{ res.justifications | markdown }}
+    <div class="card-header"><i class="fas fa-search-plus me-2"></i>3. Justifications de l'IA</div>
+    <div class="card-body bg-body-tertiary">
+        {{ res.justifications | markdown | safe }}
+    </div>
+</div>
+
+<!-- NOUVEAU : FENÊTRE MODALE D'ÉDITION POUR CETTE PAGE -->
+<div class="modal fade" id="editResultModal" tabindex="-1" aria-labelledby="editResultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editResultModalLabel">Modifier l'appréciation de {{ res.nom_eleve }} (T{{ res.trimestre }})</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <!-- Le formulaire pointe vers la même route que celle de l'historique -->
+            <form action="{{ url_for('main.edit_analyse', analyse_id=res.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="appreciation-result" class="form-label">Texte de l'appréciation :</label>
+                        <textarea class="form-control" id="appreciation-result" name="appreciation_principale" rows="10" required>{{ res.appreciation_principale }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

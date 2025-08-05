@@ -422,3 +422,20 @@ def download_bulk_pdf(classe_id, trimestre):
         headers={"Content-disposition": f"attachment; filename={filename}"}
     )
 
+@main.route('/analyse/edit/<int:analyse_id>', methods=['POST'])
+@login_required
+def edit_analyse(analyse_id):
+    """Met à jour l'appréciation d'une analyse existante."""
+    analyse = Analyse.query.get_or_404(analyse_id)
+    
+    nouvelle_appreciation = request.form.get('appreciation_principale')
+    
+    if nouvelle_appreciation:
+        analyse.appreciation_principale = nouvelle_appreciation
+        db.session.commit()
+        flash("L'appréciation a été mise à jour avec succès.", "success")
+    else:
+        flash("Le champ de l'appréciation ne peut pas être vide.", "warning")
+
+    return redirect(url_for('main.historique_classe', classe_id=analyse.classe_id))
+

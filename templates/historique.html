@@ -8,8 +8,6 @@
     </div>
     <div class="d-flex align-items-center gap-2">
         <a href="{{ url_for('main.analyser') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Retour</a>
-        
-        <!-- NOUVEAU : Menu déroulant pour le PDF de classe -->
         {% if trimestres_disponibles %}
         <div class="dropdown">
             <button class="btn btn-primary dropdown-toggle" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
@@ -43,6 +41,10 @@
                     </small>
                 </div>
                 <div class="btn-group">
+                    <!-- NOUVEAU BOUTON "MODIFIER" -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editModal-{{ analyse.id }}" title="Modifier l'appréciation">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
                     <a href="{{ url_for('main.download_pdf', analyse_id=analyse.id) }}" class="btn btn-sm btn-outline-primary" title="Télécharger en PDF">
                         <i class="fas fa-file-pdf"></i>
                     </a>
@@ -62,6 +64,30 @@
             <div class="collapse" id="justifications-{{ analyse.id }}">
                 <div class="card card-body">
                     {{ analyse.justifications | markdown }}
+                </div>
+            </div>
+        </div>
+
+        <!-- NOUVEAU : FENÊTRE MODALE D'ÉDITION (spécifique à chaque analyse) -->
+        <div class="modal fade" id="editModal-{{ analyse.id }}" tabindex="-1" aria-labelledby="editModalLabel-{{ analyse.id }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editModalLabel-{{ analyse.id }}">Modifier l'appréciation de {{ analyse.nom_eleve }} (T{{ analyse.trimestre }})</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="{{ url_for('main.edit_analyse', analyse_id=analyse.id) }}" method="POST">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="appreciation-{{ analyse.id }}" class="form-label">Texte de l'appréciation :</label>
+                                <textarea class="form-control" id="appreciation-{{ analyse.id }}" name="appreciation_principale" rows="10" required>{{ analyse.appreciation_principale }}</textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
