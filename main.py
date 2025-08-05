@@ -3,7 +3,7 @@ import re
 import pdfplumber
 import unicodedata
 import io
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session
+from flask import Blueprint, render_template, request, flash, redirect, url_for, session, current_app
 from flask_login import login_required, current_user, login_user, logout_user
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
