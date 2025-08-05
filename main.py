@@ -358,47 +358,6 @@ def supprimer_analyse(analyse_id):
     db.session.commit()
     return redirect(url_for('main.historique_classe', classe_id=classe_id))
 
-@main.route('/init-db-manuellement')
-@login_required
-def init_db_manually():
-    try:
-        db.drop_all()
-        db.create_all()
-        
-        if not Prompt.query.first():
-            default_prompt = Prompt(
-                name="Prompt par Défaut",
-                system_message="Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions.",
-                user_message_template="""Rédige une appréciation pour l'élève {nom_eleve} pour le trimestre {trimestre}.
-Contexte: {contexte_trimestre}
-
-{appreciations_precedentes}
-Voici les données BRUTES du trimestre actuel :
-{liste_appreciations}
-
-Ta réponse doit être en DEUX parties, séparées par "--- JUSTIFICATIONS ---".
-**Partie 1 : Appréciation Globale**
-Rédige un paragraphe de 2 à 3 phrases pour le bulletin en tenant compte de l'évolution de l'élève.
-**Partie 2 : Justifications**
-Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires du trimestre actuel.""",
-                is_active=True
-            )
-            db.session.add(default_prompt)
-        
-        if not AIProvider.query.first():
-             default_provider = AIProvider(
-                name="Mistral",
-                api_key=os.getenv("MISTRAL_API_KEY", "CHANGER_CETTE_CLE_DANS_LA_CONFIGURATION"),
-                model_name="mistral-large-latest",
-                is_active=True
-             )
-             db.session.add(default_provider)
-
-        db.session.commit()
-        flash("La base de données a été réinitialisée avec succès ! Un prompt et un fournisseur par défaut ont été créés.", "success")
-    except Exception as e:
-        flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
-    return redirect(url_for('main.accueil'))
 
 @main.route('/analyse/pdf/<int:analyse_id>')
 @login_required
