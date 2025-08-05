@@ -83,43 +83,64 @@ def accueil():
 @login_required
 def analyser():
     classe_id = session.get('classe_id')
-    if not classe_id: return redirect(url_for('main.accueil'))
+    if not classe_id: 
+        return redirect(url_for('main.accueil'))
+    
     classe = Classe.query.get_or_404(classe_id)
     eleves_liste = [e.strip() for e in classe.eleves.split('\n') if e.strip()]
     matieres_attendues = [m.strip() for m in classe.matieres.split(',') if m.strip()]
+    
     if request.method == 'POST':
         fichier = request.files.get('bulletin_pdf')
         nom_eleve = request.form.get('nom_eleve', '').strip()
         trimestre_str = request.form.get('trimestre')
+        
         if not all([fichier, nom_eleve, trimestre_str]):
             flash("Tous les champs sont requis.", "danger")
             return redirect(url_for('main.analyser'))
+            
         trimestre = int(trimestre_str)
+        
         try:
             active_provider = AIProvider.query.filter_by(is_active=True).first()
             active_prompt = Prompt.query.filter_by(is_active=True).first()
             if not active_provider or not active_prompt:
                 raise ValueError("Veuillez définir un Fournisseur IA et un Prompt actifs dans la Configuration.")
-            
+
             pdf_bytes = fichier.read()
             texte_extrait = ""
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                texte_extrait = pdf.pages[0].extract_text() or ""
-            if not texte_extrait: raise ValueError("Le contenu du PDF est vide.")
-            
+                full_text = [page.extract_text() for page in pdf.pages if page.extract_text()]
+                texte_extrait = "\n".join(full_text)
+
+            if not texte_extrait: 
+                raise ValueError("Le contenu du PDF est vide ou illisible.")
+
             donnees_structurees = analyser_texte_bulletin(texte_extrait, nom_eleve, matieres_attendues)
-            if not donnees_structurees.get("nom_eleve"): raise ValueError(f"Le nom '{nom_eleve}' n'a pas été trouvé dans le PDF.")
-            if len(donnees_structurees["appreciations_matieres"]) != len(matieres_attendues): raise ValueError("Le parser n'a pas trouvé le bon nombre de matières.")
+            
+            # --- CORRECTION MAJEURE : Vérifier si le parser a fonctionné ---
+            if not donnees_structurees.get("appreciations_matieres"):
+                raise ValueError(
+                    "Le parser n'a trouvé aucune matière. Vérifiez que les noms des matières dans la configuration de la classe "
+                    "correspondent EXACTEMENT à ceux du PDF (y compris les abréviations, points, et espacements comme 'SC. ECONO.& SOCIALES')."
+                )
+            # --- FIN DE LA CORRECTION ---
+
+            if not donnees_structurees.get("nom_eleve"): 
+                raise ValueError(f"Le nom '{nom_eleve}' n'a pas été trouvé dans le PDF.")
             
             appreciations_precedentes = ""
             if trimestre > 1:
                 analyses_t1 = Analyse.query.filter_by(classe_id=classe_id, nom_eleve=nom_eleve, trimestre=1).first()
-                if analyses_t1: appreciations_precedentes += f"Appréciation du Trimestre 1:\n{analyses_t1.appreciation_principale}\n\n"
+                if analyses_t1: 
+                    appreciations_precedentes += f"Appréciation du Trimestre 1:\n{analyses_t1.appreciation_principale}\n\n"
             if trimestre > 2:
                 analyses_t2 = Analyse.query.filter_by(classe_id=classe_id, nom_eleve=nom_eleve, trimestre=2).first()
-                if analyses_t2: appreciations_precedentes += f"Appréciation du Trimestre 2:\n{analyses_t2.appreciation_principale}\n\n"
+                if analyses_t2: 
+                    appreciations_precedentes += f"Appréciation du Trimestre 2:\n{analyses_t2.appreciation_principale}\n\n"
             
             contexte_trimestre = "C'est le début de l'année, l'appréciation doit être encourageante et fixer des objectifs clairs pour les deux trimestres restants." if trimestre == 1 else "C'est le milieu de l'année. L'appréciation doit faire le bilan des progrès par rapport au T1 et motiver pour le dernier trimestre." if trimestre == 2 else "C'est la fin de l'année. L'appréciation doit être un bilan final, tenir compte de l'évolution sur l'année et donner des conseils pour la poursuite d'études."
+            
             liste_appreciations = "\n".join([f"- {item['matiere']} ({item['moyenne']}): {item['commentaire']}" for item in donnees_structurees['appreciations_matieres']])
             
             prompt_systeme = active_prompt.system_message
@@ -136,20 +157,27 @@ def analyser():
                 appreciation, justifications = parties[0].strip(), parties[1].strip()
             else:
                 appreciation, justifications = reponse_ia, ""
-            
-            nouvelle_analyse = Analyse(nom_eleve=nom_eleve, trimestre=trimestre, appreciation_principale=appreciation, justifications=justifications, donnees_brutes=donnees_structurees, classe_id=classe_id, prompt_name=active_prompt.name, provider_name=active_provider.name)
+                
+            nouvelle_analyse = Analyse(
+                nom_eleve=nom_eleve, 
+                trimestre=trimestre, 
+                appreciation_principale=appreciation, 
+                justifications=justifications, 
+                donnees_brutes=donnees_structurees, 
+                classe_id=classe_id, 
+                prompt_name=active_prompt.name, 
+                provider_name=active_provider.name
+            )
             db.session.add(nouvelle_analyse)
             db.session.commit()
+            
             return render_template('resultat.html', res=nouvelle_analyse, classe=classe)
+
         except Exception as e:
             flash(f"Une erreur est survenue : {e}", "danger")
             return redirect(url_for('main.analyser'))
-    
-    analyses_faites = {}
-    for analyse in classe.analyses:
-        if analyse.nom_eleve not in analyses_faites: analyses_faites[analyse.nom_eleve] = set()
-        analyses_faites[analyse.nom_eleve].add(analyse.trimestre)
-    return render_template('analyser.html', classe=classe, eleves_liste=eleves_liste, analyses_faites=analyses_faites)
+
+    return render_template('analyser.html', classe=classe, eleves_liste=eleves_liste)
 
 @main.route('/configuration')
 @login_required
