@@ -41,8 +41,14 @@
                     </small>
                 </div>
                 <div class="btn-group">
-                    <!-- NOUVEAU BOUTON "MODIFIER" -->
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editModal-{{ analyse.id }}" title="Modifier l'appréciation">
+                    <!-- MODIFICATION DU BOUTON : Il a maintenant des attributs data-* pour le JS -->
+                    <button type="button" class="btn btn-sm btn-outline-secondary edit-btn" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editModal"
+                            data-action="{{ url_for('main.edit_analyse', analyse_id=analyse.id) }}"
+                            data-title="Modifier l'appréciation de {{ analyse.nom_eleve }} (T{{ analyse.trimestre }})"
+                            data-content="{{ analyse.appreciation_principale }}"
+                            title="Modifier l'appréciation">
                         <i class="fas fa-pencil-alt"></i>
                     </button>
                     <a href="{{ url_for('main.download_pdf', analyse_id=analyse.id) }}" class="btn btn-sm btn-outline-primary" title="Télécharger en PDF">
@@ -67,34 +73,65 @@
                 </div>
             </div>
         </div>
-
-        <!-- NOUVEAU : FENÊTRE MODALE D'ÉDITION (spécifique à chaque analyse) -->
-        <div class="modal fade" id="editModal-{{ analyse.id }}" tabindex="-1" aria-labelledby="editModalLabel-{{ analyse.id }}" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="editModalLabel-{{ analyse.id }}">Modifier l'appréciation de {{ analyse.nom_eleve }} (T{{ analyse.trimestre }})</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <form action="{{ url_for('main.edit_analyse', analyse_id=analyse.id) }}" method="POST">
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label for="appreciation-{{ analyse.id }}" class="form-label">Texte de l'appréciation :</label>
-                                <textarea class="form-control" id="appreciation-{{ analyse.id }}" name="appreciation_principale" rows="10" required>{{ analyse.appreciation_principale }}</textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                            <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
         {% endfor %}
     </div>
 </div>
 {% else %}
 <div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>Aucune analyse n'a encore été sauvegardée pour cette classe.</div>
 {% endfor %}
+
+
+<!-- NOUVEAU : UNE SEULE FENÊTRE MODALE GÉNÉRIQUE POUR TOUTE LA PAGE -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">Modifier l'appréciation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <!-- Le 'action' du formulaire sera défini par JavaScript -->
+            <form id="edit-form" action="" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="appreciation-text" class="form-label">Texte de l'appréciation :</label>
+                        <textarea class="form-control" id="appreciation-text" name="appreciation_principale" rows="10" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- NOUVEAU : JAVASCRIPT POUR GÉRER LA MODALE UNIQUE -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const editModal = document.getElementById('editModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function (event) {
+            // Bouton qui a déclenché la modale
+            const button = event.relatedTarget;
+
+            // Extraire les informations des attributs data-*
+            const action = button.getAttribute('data-action');
+            const title = button.getAttribute('data-title');
+            const content = button.getAttribute('data-content');
+
+            // Mettre à jour le contenu de la modale
+            const modalTitle = editModal.querySelector('.modal-title');
+            const modalTextarea = editModal.querySelector('#appreciation-text');
+            const modalForm = editModal.querySelector('#edit-form');
+
+            modalTitle.textContent = title;
+            modalTextarea.value = content;
+            modalForm.setAttribute('action', action);
+        });
+    }
+});
+</script>
 {% endblock %}
