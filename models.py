@@ -1,13 +1,10 @@
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
+# models.py
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func, ForeignKey
+from flask_login import UserMixin
 from itsdangerous import URLSafeTimedSerializer as Serializer
 from flask import current_app
-from app import bcrypt # On importe bcrypt depuis app.py
+from extensions import db, bcrypt # MODIFICATION : on importe depuis extensions.py
 
-db = SQLAlchemy()
-
-# Le modèle User devient une table complète dans la BDD
 class User(db.Model, UserMixin):
     id = Column(Integer, primary_key=True)
     username = Column(String(20), unique=True, nullable=False)
@@ -33,7 +30,7 @@ class User(db.Model, UserMixin):
             return None
         return User.query.get(user_id)
 
-# Le reste des modèles ne change pas
+# Le reste du fichier models.py ne change pas...
 class Classe(db.Model):
     id = db.Column(Integer, primary_key=True)
     annee_scolaire = db.Column(String(10), nullable=False)

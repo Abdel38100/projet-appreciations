@@ -13,7 +13,7 @@ from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
 from flask import Response
 from weasyprint import HTML
-from app import mail
+from extensions import mail
 from flask_mail import Message
 
 main = Blueprint('main', __name__)
