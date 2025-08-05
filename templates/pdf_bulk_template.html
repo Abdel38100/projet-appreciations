@@ -28,37 +28,41 @@
         .student-page:last-child {
             page-break-after: auto;
         }
+        /* --- OPTIMISATION DU TITRE --- */
         h1 {
             font-family: 'Merriweather', serif;
-            font-size: 16pt;
+            font-size: 14pt; /* Police réduite */
             color: #1e293b;
             text-align: center;
-            border-bottom: 2px solid #3b82f6;
-            padding-bottom: 8px;
-            margin-bottom: 20px;
+            border-bottom: 1px solid #aab8c2; /* Ligne plus fine et discrète */
+            padding-bottom: 5px; /* Espacement interne réduit */
+            margin-bottom: 15px; /* Marge externe réduite */
         }
+        /* --- OPTIMISATION DU TABLEAU D'INFO --- */
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 15px; /* Marge externe réduite */
         }
         .info-table td {
-            padding: 5px 8px;
+            padding: 4px 6px; /* Espacement interne des cellules réduit */
             border: 1px solid #e2e8f0;
+            font-size: 9pt; /* Police du tableau réduite */
         }
         .info-table .label {
             font-weight: bold;
             background-color: #f1f5f9;
             width: 20%;
         }
+        /* --- OPTIMISATION DES TITRES DE SECTION --- */
         .section-title {
             font-family: 'Merriweather', serif;
-            font-size: 12pt;
+            font-size: 11pt; /* Police réduite */
             color: #3b82f6;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 4px;
-            margin-top: 20px;
-            margin-bottom: 10px;
+            padding-bottom: 3px; /* Espacement interne réduit */
+            margin-top: 15px; /* Marge supérieure FORTEMENT réduite */
+            margin-bottom: 8px; /* Marge inférieure réduite */
         }
         .content {
             background-color: #f8fafc;
@@ -75,16 +79,15 @@
             white-space: normal;
         }
         
-        /* NOUVEAUX STYLES POUR FORMATER LES LISTES MARKDOWN */
         .justifications ul, .justifications ol {
-            padding-left: 20px; /* Ajoute une indentation à la liste */
+            padding-left: 20px;
             margin: 5px 0;
         }
         .justifications li {
-            margin-bottom: 8px; /* Espace entre chaque point de la liste */
+            margin-bottom: 8px;
         }
         .justifications strong, .justifications b {
-            color: #1e293b; /* Met en évidence les titres des points */
+            color: #1e293b;
         }
     </style>
 </head>
@@ -116,9 +119,6 @@
         {% if analyse.justifications %}
         <div class="section-title">Justifications</div>
         <div class="content justifications">
-            <!-- MODIFICATION CLÉ : On utilise le filtre 'markdown' et 'safe' -->
-            <!-- 'markdown' convertit le texte en HTML (listes, etc.) -->
-            <!-- 'safe' indique à Jinja2 de ne pas échapper les balises HTML générées -->
             {{ analyse.justifications | markdown | safe }}
         </div>
         {% endif %}
