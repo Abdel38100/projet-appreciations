@@ -1,11 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Configuration{% endblock %}
+{% block title %}Configuration des Classes{% endblock %}
 {% block content %}
-<div class="row g-4">
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-header"><h3>Ajouter / Modifier une classe</h3></div>
-            <div class="card-body">
+<h2 class="mb-4"><i class="fas fa-school me-2"></i>Configuration des Classes</h2>
+<div class="row g-5">
+    <!-- Colonne de gauche: Formulaire d'ajout -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header p-3">
+                <h3 class="mb-0 fs-5"><i class="fas fa-plus-circle me-2"></i>Ajouter / Modifier une classe</h3>
+            </div>
+            <div class="card-body p-4">
                 <form method="POST" action="{{ url_for('main.configuration') }}">
                     <div class="mb-3">
                         <label for="annee_scolaire" class="form-label">Année Scolaire (ex: 2024-2025)</label>
@@ -23,29 +27,33 @@
                         <label for="eleves" class="form-label">Liste des élèves (NOM Prénom, un par ligne)</label>
                         <textarea class="form-control" id="eleves" name="eleves" rows="8" required></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary">Enregistrer la classe</button>
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-save me-2"></i>Enregistrer la classe</button>
                 </form>
             </div>
         </div>
     </div>
-    <div class="col-md-7">
-        <h3>Classes existantes</h3>
+
+    <!-- Colonne de droite: Liste des classes -->
+    <div class="col-lg-7">
+        <h3 class="mb-3"><i class="fas fa-list-ul me-2"></i>Classes existantes</h3>
         {% for classe in classes %}
         <div class="card mb-3">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
+            <div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="card-title">{{ classe.nom_classe }}</h5>
-                        <h6 class="card-subtitle mb-2 text-muted">{{ classe.annee_scolaire }}</h6>
+                        <h5 class="card-title mb-1">{{ classe.nom_classe }}</h5>
+                        <h6 class="card-subtitle text-muted">{{ classe.annee_scolaire }}</h6>
                     </div>
                     <form action="{{ url_for('main.supprimer_classe', classe_id=classe.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette classe et toutes ses analyses ?');">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash-alt"></i> Supprimer</button>
                     </form>
                 </div>
             </div>
         </div>
         {% else %}
-        <p>Aucune classe n'est configurée pour le moment.</p>
+        <div class="alert alert-secondary">
+            <i class="fas fa-info-circle me-2"></i>Aucune classe n'est configurée pour le moment.
+        </div>
         {% endfor %}
     </div>
 </div>

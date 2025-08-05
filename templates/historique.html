@@ -1,45 +1,53 @@
 {% extends "base.html" %}
 {% block title %}Historique pour {{ classe.nom_classe }}{% endblock %}
 {% block content %}
-<h2>Historique des Analyses pour : {{ classe.nom_classe }} ({{ classe.annee_scolaire }})</h2>
-<a href="{{ url_for('main.analyser') }}" class="btn btn-secondary mb-3">Retour à l'analyse</a>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-history me-2"></i>Historique des Analyses</h2>
+        <p class="text-muted fs-5">{{ classe.nom_classe }} ({{ classe.annee_scolaire }})</p>
+    </div>
+    <a href="{{ url_for('main.analyser') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Retour à l'analyse</a>
+</div>
 
 {% for nom_eleve, analyses in analyses_par_eleve.items() %}
 <div class="card mb-4">
-    <div class="card-header bg-dark text-white">
-        <h4 class="mb-0">{{ nom_eleve }}</h4>
+    <div class="card-header bg-dark text-white p-3">
+        <h4 class="mb-0"><i class="fas fa-user-graduate me-2"></i>{{ nom_eleve }}</h4>
     </div>
-    <div class="card-body">
+    <div class="card-body p-2 p-md-3">
         {% for analyse in analyses %}
-        <div class="border p-3 mb-3 rounded">
+        <div class="border p-3 mb-3 rounded-3 bg-light">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
-                    <h5 class="mb-1">Trimestre {{ analyse.trimestre }}</h5>
+                    <h5 class="mb-1 fw-bold text-primary">Trimestre {{ analyse.trimestre }}</h5>
                     <small class="text-muted">
-                        Généré le {{ analyse.created_at.strftime('%d/%m/%Y à %H:%M') }} 
-                        avec {{ analyse.provider_name }} (Prompt: {{ analyse.prompt_name }})
+                        <i class="fas fa-calendar-alt me-1"></i> {{ analyse.created_at.strftime('%d/%m/%Y à %H:%M') }} | 
+                        <i class="fas fa-cogs me-1"></i> {{ analyse.provider_name }} | 
+                        <i class="fas fa-lightbulb me-1"></i> {{ analyse.prompt_name }}
                     </small>
                 </div>
                 <form action="{{ url_for('main.supprimer_analyse', analyse_id=analyse.id) }}" method="POST" onsubmit="return confirm('Voulez-vous vraiment supprimer cette version de l\'appréciation ?');">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Supprimer</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer cette analyse"><i class="fas fa-trash-alt"></i></button>
                 </form>
             </div>
             <hr>
-            <h6>Appréciation Générale :</h6>
-            <p class="card-text bg-light p-2 rounded">{{ analyse.appreciation_principale }}</p>
+            <h6><i class="fas fa-pen-alt me-2"></i>Appréciation Générale :</h6>
+            <p class="card-text bg-white p-3 rounded-3 shadow-sm">{{ analyse.appreciation_principale }}</p>
             <p>
-              <a class="btn btn-secondary btn-sm" data-bs-toggle="collapse" href="#justifications-{{ analyse.id }}">Voir/Cacher les justifications</a>
+                <a class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" href="#justifications-{{ analyse.id }}">
+                    <i class="fas fa-search-plus me-1"></i>Voir/Cacher les justifications
+                </a>
             </p>
             <div class="collapse" id="justifications-{{ analyse.id }}">
-              <div class="card card-body">
-                {{ analyse.justifications | markdown }}
-              </div>
+                <div class="card card-body">
+                    {{ analyse.justifications | markdown }}
+                </div>
             </div>
         </div>
         {% endfor %}
     </div>
 </div>
 {% else %}
-<div class="alert alert-info">Aucune analyse n'a encore été sauvegardée pour cette classe.</div>
+<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>Aucune analyse n'a encore été sauvegardée pour cette classe.</div>
 {% endfor %}
 {% endblock %}

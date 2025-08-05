@@ -2,40 +2,71 @@
 {% block title %}Analyse pour {{ classe.nom_classe }}{% endblock %}
 {% block content %}
 <div class="card shadow-sm">
-    <div class="card-header">
-        <h2>Analyse pour la classe : {{ classe.nom_classe }} <small class="text-muted">({{ classe.annee_scolaire }})</small></h2>
+    <div class="card-header text-center p-4">
+        <h2><i class="fas fa-flask-vial me-2"></i>Analyse pour la classe : {{ classe.nom_classe }}</h2>
+        <p class="text-muted mb-0">Année scolaire {{ classe.annee_scolaire }}</p>
     </div>
-    <div class="card-body">
+    <div class="card-body p-4 p-md-5">
         <form action="{{ url_for('main.analyser') }}" method="post" enctype="multipart/form-data">
-            <div class="row">
-                <div class="col-md-2 mb-3">
-                    <label for="trimestre" class="form-label">1. Trimestre</label>
-                    <select class="form-select" id="trimestre" name="trimestre" required>
-                        <option value="1">T1</option>
-                        <option value="2">T2</option>
-                        <option value="3">T3</option>
+            
+            <div class="row g-4">
+                <!-- Étape 1: Trimestre -->
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="fa-stack fa-1x me-2">
+                          <i class="fas fa-circle fa-stack-2x text-primary"></i>
+                          <strong class="fa-stack-1x fa-inverse">1</strong>
+                        </span>
+                        <label for="trimestre" class="form-label fw-bold mb-0">Trimestre</label>
+                    </div>
+                    <select class="form-select form-select-lg" id="trimestre" name="trimestre" required>
+                        <option value="1">Trimestre 1</option>
+                        <option value="2">Trimestre 2</option>
+                        <option value="3">Trimestre 3</option>
                     </select>
                 </div>
-                <div class="col-md-5 mb-3">
-                    <label for="nom_eleve" class="form-label">2. Élève à analyser</label>
-                    <select class="form-select" id="nom_eleve" name="nom_eleve" required>
+
+                <!-- Étape 2: Élève -->
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="fa-stack fa-1x me-2">
+                          <i class="fas fa-circle fa-stack-2x text-primary"></i>
+                          <strong class="fa-stack-1x fa-inverse">2</strong>
+                        </span>
+                        <label for="nom_eleve" class="form-label fw-bold mb-0">Élève à analyser</label>
+                    </div>
+                    <select class="form-select form-select-lg" id="nom_eleve" name="nom_eleve" required>
                         <option value="" disabled selected>Sélectionnez un élève...</option>
                         {% for eleve in eleves_liste %}
-                            <option value="{{ eleve }}">
-                                {{ eleve }}
-                            </option>
+                        <option value="{{ eleve }}">{{ eleve }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-5 mb-3">
-                    <label for="bulletin_pdf" class="form-label">3. Bulletin PDF</label>
-                    <input class="form-control" type="file" id="bulletin_pdf" name="bulletin_pdf" accept=".pdf" required>
+
+                <!-- Étape 3: Bulletin -->
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="fa-stack fa-1x me-2">
+                          <i class="fas fa-circle fa-stack-2x text-primary"></i>
+                          <strong class="fa-stack-1x fa-inverse">3</strong>
+                        </span>
+                        <label for="bulletin_pdf" class="form-label fw-bold mb-0">Bulletin PDF</label>
+                    </div>
+                    <input class="form-control form-control-lg" type="file" id="bulletin_pdf" name="bulletin_pdf" accept=".pdf" required>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Lancer l'analyse pour cet élève</button>
+
+            <hr class="my-4">
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="btn btn-secondary">
+                    <i class="fas fa-history me-2"></i>Voir l'historique de cette classe
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-rocket me-2"></i>Lancer l'analyse
+                </button>
+            </div>
         </form>
-        <hr>
-        <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="btn btn-info">Voir l'historique de cette classe</a>
     </div>
 </div>
 {% endblock %}

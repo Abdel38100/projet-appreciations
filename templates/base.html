@@ -4,61 +4,167 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Analyseur d'Appréciations{% endblock %}</title>
+    
+    <!-- Frameworks & Librairies -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles Personnalisés -->
+    <style>
+        :root {
+            --bs-primary-rgb: 71, 85, 105; /* Slate-600 */
+            --bs-secondary-rgb: 100, 116, 139; /* Slate-500 */
+            --bs-success-rgb: 22, 163, 74; /* Green-600 */
+            --bs-info-rgb: 59, 130, 246; /* Blue-500 */
+            --bs-warning-rgb: 245, 158, 11; /* Amber-500 */
+            --bs-danger-rgb: 220, 38, 38; /* Red-600 */
+            --bs-light-rgb: 241, 245, 249; /* Slate-100 */
+            --bs-dark-rgb: 15, 23, 42; /* Slate-900 */
+            --bs-font-sans-serif: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bs-light-rgb);
+            font-family: var(--bs-font-sans-serif);
+        }
+
+        .navbar {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .navbar-brand {
+            font-weight: 600;
+        }
+
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-radius: 0.375rem;
+            margin: 0 0.25rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: rgba(255,255,255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .card {
+            border: none;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+            transition: transform 0.2s ease-in-out;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
+        .card-header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e2e8f0; /* Slate-200 */
+            font-weight: 600;
+        }
+        
+        .card-header h2, .card-header h3, .card-header h4 {
+            color: var(--bs-dark);
+            font-weight: 700;
+        }
+        
+        .btn {
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+            padding: 0.6rem 1.2rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(var(--bs-primary-rgb), 0.2);
+        }
+        
+        .btn-primary {
+             background-color: #3b82f6; /* Blue-500 */
+             border-color: #3b82f6;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2563eb; /* Blue-600 */
+            border-color: #2563eb;
+        }
+
+        .alert {
+            border-radius: 0.5rem;
+            border-left-width: 5px;
+        }
+        
+        .form-control, .form-select {
+            border-radius: 0.5rem;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(var(--bs-info-rgb), 0.25);
+            border-color: rgba(var(--bs-info-rgb), 0.8);
+        }
+    </style>
 </head>
 <body class="bg-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand" href="{{ url_for('main.accueil') }}">🚀 Analyseur d'Appréciations</a>
-            
-            {% if current_user.is_authenticated %}
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.accueil') }}">Accueil</a>
-                    </li>
-                    
-                    <!-- LIEN CONDITIONNEL POUR L'ANALYSE (S'affiche si une classe est sélectionnée) -->
-                    {% if session.get('classe_id') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.analyser') }}">Analyser la Classe</a>
-                    </li>
-                    {% endif %}
-                    
-                    <!-- LIENS SIMPLES AU LIEU D'UN MENU DÉROULANT -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.configuration') }}">Classes</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.list_prompts') }}">Prompts IA</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.list_providers') }}">Fournisseurs IA</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.logout') }}">Déconnexion</a>
-                    </li>
-                </ul>
-            </div>
-            {% endif %}
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('main.accueil') }}">🚀 Analyseur d'Appréciations</a>
+        {% if current_user.is_authenticated %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.accueil' %}active{% endif %}" href="{{ url_for('main.accueil') }}"><i class="fas fa-home me-1"></i>Accueil</a>
+                </li>
+                {% if session.get('classe_id') %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.analyser' %}active{% endif %}" href="{{ url_for('main.analyser') }}"><i class="fas fa-flask me-1"></i>Analyser</a>
+                </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint == 'main.configuration' %}active{% endif %}" href="{{ url_for('main.configuration') }}"><i class="fas fa-school me-1"></i>Classes</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint in ['main.list_prompts', 'main.add_prompt', 'main.edit_prompt'] %}active{% endif %}" href="{{ url_for('main.list_prompts') }}"><i class="fas fa-lightbulb me-1"></i>Prompts IA</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if request.endpoint in ['main.list_providers', 'main.add_provider', 'main.edit_provider'] %}active{% endif %}" href="{{ url_for('main.list_providers') }}"><i class="fas fa-cogs me-1"></i>Fournisseurs IA</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('main.logout') }}"><i class="fas fa-sign-out-alt me-1"></i>Déconnexion</a>
+                </li>
+            </ul>
         </div>
-    </nav>
-    <main class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message | safe }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </main>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        {% endif %}
+    </div>
+</nav>
+
+<main class="container my-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message | safe }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

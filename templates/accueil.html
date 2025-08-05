@@ -2,39 +2,44 @@
 {% block title %}Accueil{% endblock %}
 {% block content %}
 <div class="card shadow-sm">
-    <div class="card-header"><h2>Tableau de Bord</h2></div>
-    <div class="card-body">
+    <div class="card-header p-4">
+        <h2><i class="fas fa-tachometer-alt me-2"></i>Tableau de Bord</h2>
+    </div>
+    <div class="card-body p-4">
         {% if not classes %}
-            <div class="alert alert-warning">
-                Aucune classe n'est configurée. Veuillez commencer par <a href="{{ url_for('main.configuration') }}" class="alert-link">configurer une classe</a>.
-            </div>
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle me-2"></i>Aucune classe n'est configurée. Veuillez commencer par <a href="{{ url_for('main.configuration') }}" class="alert-link">configurer une classe</a>.
+        </div>
         {% else %}
-            <form action="{{ url_for('main.accueil') }}" method="post">
-                <div class="mb-3">
-                    <label for="classe_id" class="form-label">Sélectionnez la classe à analyser :</label>
-                    <div class="input-group">
-                        <select class="form-select" id="classe_id" name="classe_id" required>
-                            <option value="" disabled selected>Choisissez...</option>
-                            {% for classe in classes %}
-                                <option value="{{ classe.id }}" {% if derniere_classe_id == classe.id|string %}selected{% endif %}>
-                                    {{ classe.annee_scolaire }} - {{ classe.nom_classe }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="btn btn-primary">Valider</button>
-                    </div>
+        <form action="{{ url_for('main.accueil') }}" method="post">
+            <div class="mb-4">
+                <label for="classe_id" class="form-label fs-5 fw-semibold">Sélectionnez la classe à analyser :</label>
+                <div class="input-group">
+                    <select class="form-select form-select-lg" id="classe_id" name="classe_id" required>
+                        <option value="" disabled selected>Choisissez une classe...</option>
+                        {% for classe in classes %}
+                        <option value="{{ classe.id }}" {% if derniere_classe_id == classe.id|string %}selected{% endif %}>
+                            {{ classe.annee_scolaire }} - {{ classe.nom_classe }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-arrow-right me-2"></i>Valider</button>
                 </div>
-            </form>
-            <hr>
-            <h4>Historique par classe</h4>
-            <div class="list-group">
-                {% for classe in classes %}
-                    <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="list-group-item list-group-item-action">
-                        {{ classe.annee_scolaire }} - {{ classe.nom_classe }}
-                        <span class="badge bg-secondary float-end">{{ classe.analyses|length }} analyse(s)</span>
-                    </a>
-                {% endfor %}
             </div>
+        </form>
+        <hr class="my-4">
+        <h4><i class="fas fa-history me-2"></i>Historique par classe</h4>
+        <div class="list-group">
+            {% for classe in classes %}
+            <a href="{{ url_for('main.historique_classe', classe_id=classe.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <span class="fw-bold">{{ classe.nom_classe }}</span>
+                    <small class="text-muted ms-2">{{ classe.annee_scolaire }}</small>
+                </div>
+                <span class="badge bg-primary rounded-pill">{{ classe.analyses|length }} analyse(s)</span>
+            </a>
+            {% endfor %}
+        </div>
         {% endif %}
     </div>
 </div>
