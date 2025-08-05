@@ -555,3 +555,70 @@ def reset_password(token):
         else:
             flash('Les mots de passe ne correspondent pas.', 'danger')
     return render_template('reset_token.html', token=token)
+
+@main.route('/init-db-manuellement')
+@login_required # Sécurisons cette route pour que seul un utilisateur connecté puisse l'appeler
+def init_db_manually():
+    """
+    Route web pour réinitialiser la base de données manuellement sur Render.
+    ATTENTION : CECI SUPPRIME TOUTES LES DONNÉES EXISTANTES !
+    """
+    try:
+        # On importe les modèles ici pour éviter des imports circulaires au démarrage
+        from models import User, Prompt, AIProvider
+        from extensions import db
+
+        # Contexte d'application nécessaire pour les opérations sur la BDD
+        from flask import current_app
+        with current_app.app_context():
+            db.drop_all() # Supprime toutes les tables
+            db.create_all() # Crée les nouvelles tables
+
+            # Recréer l'utilisateur admin par défaut
+            if not User.query.first():
+                admin_username = os.getenv('APP_USERNAME', 'admin')
+                admin_email = os.getenv('APP_EMAIL', 'admin@example.com')
+                admin_password = os.getenv('APP_PASSWORD', 'password')
+                
+                admin_user = User(username=admin_username, email=admin_email)
+                admin_user.set_password(admin_password)
+                db.session.add(admin_user)
+            
+            # Recréer le prompt par défaut
+            if not Prompt.query.first():
+                default_prompt = Prompt(
+                    name="Prompt par Défaut",
+                    system_message="Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions.",
+                    user_message_template="""Rédige une appréciation pour l'élève {nom_eleve} pour le trimestre {trimestre}.
+Contexte: {contexte_trimestre}
+
+{appreciations_precedentes}
+Voici les données BRUTES du trimestre actuel :
+{liste_appreciations}
+
+Ta réponse doit être en DEUX parties, séparées par "--- JUSTIFICATIONS ---".
+**Partie 1 : Appréciation Globale**
+Rédige un paragraphe de 2 à 3 phrases pour le bulletin en tenant compte de l'évolution de l'élève.
+**Partie 2 : Justifications**
+Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires du trimestre actuel.""",
+                    is_active=True
+                )
+                db.session.add(default_prompt)
+
+            # Recréer le fournisseur IA par défaut
+            if not AIProvider.query.first():
+                default_provider = AIProvider(
+                    name="Mistral",
+                    api_key=os.getenv("MISTRAL_API_KEY", "CHANGER_CETTE_CLE_DANS_LA_CONFIGURATION"),
+                    model_name="mistral-large-latest",
+                    is_active=True
+                )
+                db.session.add(default_provider)
+
+            db.session.commit()
+
+        flash("La base de données a été réinitialisée avec succès !", "success")
+    except Exception as e:
+        flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
+    
+    return redirect(url_for('main.accueil'))
