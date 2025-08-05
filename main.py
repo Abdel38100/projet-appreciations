@@ -543,6 +543,7 @@ def reset_password(token):
             flash('Les mots de passe ne correspondent pas.', 'danger')
     return render_template('reset_token.html', token=token)
 
+
 @main.route('/init-db-manuellement')
 def init_db_manually():
     """
@@ -568,19 +569,33 @@ def init_db_manually():
                 admin_user.set_password(admin_password)
                 db.session.add(admin_user)
             
+            # --- CORRECTION MAJEURE : Restaurer le template utilisateur complet ---
             if not Prompt.query.first():
                 default_prompt = Prompt(
                     name="Prompt par Défaut",
-                    system_message="Tu es un professeur principal...",
-                    user_message_template="""Rédige une appréciation...""",
+                    system_message="Tu es un professeur principal qui rédige l'appréciation générale. Ton style est synthétique, analytique et tu justifies tes conclusions.",
+                    user_message_template="""Rédige une appréciation pour l'élève {nom_eleve} pour le trimestre {trimestre}.
+Contexte important : {contexte_trimestre}
+
+{appreciations_precedentes}
+
+Voici les données BRUTES du trimestre actuel :
+{liste_appreciations}
+
+Ta réponse doit être en DEUX parties, séparées par "--- JUSTIFICATIONS ---".
+**Partie 1 : Appréciation Globale**
+Rédige un paragraphe de 2 à 3 phrases pour le bulletin en tenant compte de l'évolution de l'élève si des données des trimestres précédents sont disponibles.
+**Partie 2 : Justifications**
+Sous le séparateur, justifie chaque idée clé avec des citations brutes des commentaires DU TRIMESTRE ACTUEL.""",
                     is_active=True
                 )
                 db.session.add(default_prompt)
+            # --- FIN DE LA CORRECTION ---
 
             if not AIProvider.query.first():
                 default_provider = AIProvider(
                     name="Mistral",
-                    api_key=os.getenv("MISTRAL_API_KEY", "CHANGER_CETTE_CLE"),
+                    api_key=os.getenv("MISTRAL_API_KEY", "CHANGER_CETTE_CLE_DANS_LA_CONFIGURATION"),
                     model_name="mistral-large-latest",
                     is_active=True
                 )
@@ -590,7 +605,6 @@ def init_db_manually():
 
         flash("La base de données a été réinitialisée avec succès ! Vous pouvez maintenant vous connecter avec les identifiants par défaut.", "success")
     except Exception as e:
-        # Maintenant, si une autre erreur survient, elle sera affichée !
         flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
     
-    return redirect(url_for('main.login')) # Redirige vers la page de login après initialisation
+    return redirect(url_for('main.login'))
