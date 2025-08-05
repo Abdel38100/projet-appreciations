@@ -41,7 +41,6 @@
                     </small>
                 </div>
                 <div class="btn-group">
-                    <!-- MODIFICATION DU BOUTON : Il a maintenant des attributs data-* pour le JS -->
                     <button type="button" class="btn btn-sm btn-outline-secondary edit-btn" 
                             data-bs-toggle="modal" 
                             data-bs-target="#editModal"
@@ -81,7 +80,7 @@
 {% endfor %}
 
 
-<!-- NOUVEAU : UNE SEULE FENÊTRE MODALE GÉNÉRIQUE POUR TOUTE LA PAGE -->
+<!-- UNE SEULE FENÊTRE MODALE GÉNÉRIQUE POUR TOUTE LA PAGE -->
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -89,7 +88,6 @@
                 <h5 class="modal-title" id="editModalLabel">Modifier l'appréciation</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <!-- Le 'action' du formulaire sera défini par JavaScript -->
             <form id="edit-form" action="" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
@@ -105,33 +103,30 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
-<!-- NOUVEAU : JAVASCRIPT POUR GÉRER LA MODALE UNIQUE -->
+<!-- CORRECTION : Script déplacé à la fin du bloc content pour garantir son exécution -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
     const editModal = document.getElementById('editModal');
     if (editModal) {
-        editModal.addEventListener('show.bs.modal', function (event) {
-            // Bouton qui a déclenché la modale
+        // L'événement 'show.bs.modal' est l'écouteur standard de Bootstrap
+        editModal.addEventListener('show.bs.modal', event => {
+            // On récupère le bouton qui a été cliqué pour ouvrir la modale
             const button = event.relatedTarget;
-
-            // Extraire les informations des attributs data-*
+            
+            // On extrait les informations des attributs data-* du bouton
             const action = button.getAttribute('data-action');
             const title = button.getAttribute('data-title');
             const content = button.getAttribute('data-content');
 
-            // Mettre à jour le contenu de la modale
+            // On met à jour les éléments de la modale avec les infos récupérées
             const modalTitle = editModal.querySelector('.modal-title');
-            const modalTextarea = editModal.querySelector('#appreciation-text');
             const modalForm = editModal.querySelector('#edit-form');
+            const modalTextarea = editModal.querySelector('#appreciation-text');
 
             modalTitle.textContent = title;
+            modalForm.action = action;
             modalTextarea.value = content;
-            modalForm.setAttribute('action', action);
         });
     }
-});
 </script>
 {% endblock %}
