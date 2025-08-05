@@ -11,6 +11,8 @@ from groq import Groq
 from openai import OpenAI
 from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
+from flask import Response
+from weasyprint import HTML
 
 main = Blueprint('main', __name__)
 
@@ -171,10 +173,21 @@ def supprimer_classe(classe_id):
 def historique_classe(classe_id):
     classe = Classe.query.get_or_404(classe_id)
     analyses_par_eleve = {}
+    
+    # Logique existante pour trier par élève
     eleves_tries = sorted(list(set(a.nom_eleve for a in classe.analyses)))
     for nom_eleve in eleves_tries:
         analyses_par_eleve[nom_eleve] = sorted([a for a in classe.analyses if a.nom_eleve == nom_eleve], key=lambda x: (x.trimestre, x.created_at))
-    return render_template('historique.html', classe=classe, analyses_par_eleve=analyses_par_eleve)
+    
+    # NOUVELLE LOGIQUE : Trouver les trimestres pour lesquels il existe au moins une analyse
+    trimestres_disponibles = sorted(list(set(a.trimestre for a in classe.analyses)))
+    
+    return render_template(
+        'historique.html', 
+        classe=classe, 
+        analyses_par_eleve=analyses_par_eleve,
+        trimestres_disponibles=trimestres_disponibles  # On passe la nouvelle variable
+    )
 
 @main.route('/prompts')
 @login_required
@@ -340,4 +353,72 @@ Sous le séparateur, justifie chaque idée clé avec des citations brutes des co
     except Exception as e:
         flash(f"Erreur lors de l'initialisation de la BDD : {e}", "danger")
     return redirect(url_for('main.accueil'))
+
+@main.route('/analyse/pdf/<int:analyse_id>')
+@login_required
+def download_pdf(analyse_id):
+    """Génère et télécharge une analyse en format PDF."""
+    analyse = Analyse.query.get_or_404(analyse_id)
+    classe = analyse.classe # SQLAlchemy backref nous donne accès à la classe
+    
+    # Rendre le template HTML avec les données de l'analyse
+    html_string = render_template('pdf_template.html', analyse=analyse, classe=classe)
+    
+    # Utiliser WeasyPrint pour convertir le HTML en PDF
+    pdf_bytes = HTML(string=html_string).write_pdf()
+    
+    # Créer un nom de fichier propre
+    filename = f"appreciation_{analyse.nom_eleve.replace(' ', '_')}_T{analyse.trimestre}.pdf"
+    
+    # Renvoyer la réponse Flask avec le PDF
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-disposition": f"attachment; filename={filename}"}
+    )
+
+
+@main.route('/historique/pdf_classe/<int:classe_id>/trimestre/<int:trimestre>')
+@login_required
+def download_bulk_pdf(classe_id, trimestre):
+    """
+    Génère un PDF unique avec l'appréciation la plus récente de chaque élève 
+    pour un trimestre donné.
+    """
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # 1. Récupérer toutes les analyses pour le trimestre
+    analyses_trimestre = Analyse.query.filter_by(classe_id=classe_id, trimestre=trimestre).all()
+    
+    # 2. Identifier tous les élèves uniques ayant une analyse
+    noms_eleves = sorted(list(set(a.nom_eleve for a in analyses_trimestre)))
+    
+    # 3. Pour chaque élève, trouver son analyse la plus récente pour ce trimestre
+    analyses_finales = []
+    for nom in noms_eleves:
+        analyse_recente = Analyse.query.filter_by(
+            classe_id=classe_id, 
+            trimestre=trimestre, 
+            nom_eleve=nom
+        ).order_by(Analyse.created_at.desc()).first()
+        if analyse_recente:
+            analyses_finales.append(analyse_recente)
+    
+    if not analyses_finales:
+        flash(f"Aucune analyse à inclure dans le PDF pour le Trimestre {trimestre}.", "warning")
+        return redirect(url_for('main.historique_classe', classe_id=classe_id))
+
+    # 4. Rendre le template HTML avec la liste des analyses finales
+    html_string = render_template('pdf_bulk_template.html', analyses=analyses_finales, classe=classe, trimestre=trimestre)
+    
+    # 5. Convertir en PDF
+    pdf_bytes = HTML(string=html_string).write_pdf()
+    
+    filename = f"appreciations_{classe.nom_classe.replace(' ', '_')}_T{trimestre}.pdf"
+    
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-disposition": f"attachment; filename={filename}"}
+    )
 
