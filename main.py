@@ -147,18 +147,48 @@ def analyser():
         analyses_faites[analyse.nom_eleve].add(analyse.trimestre)
     return render_template('analyser.html', classe=classe, eleves_liste=eleves_liste, analyses_faites=analyses_faites)
 
-@main.route('/configuration', methods=['GET', 'POST'])
+@main.route('/configuration')
 @login_required
 def configuration():
-    if request.method == 'POST':
-        annee, nom_classe, matieres, eleves = request.form.get('annee_scolaire'), request.form.get('nom_classe'), request.form.get('matieres'), request.form.get('eleves')
-        if all([annee, nom_classe, matieres, eleves]):
-            db.session.add(Classe(annee_scolaire=annee, nom_classe=nom_classe, matieres=matieres, eleves=eleves))
-            db.session.commit()
-            flash("Nouvelle classe ajoutée !", "success")
-        return redirect(url_for('main.configuration'))
+    """Affiche uniquement la liste des classes existantes."""
     classes = Classe.query.order_by(Classe.annee_scolaire.desc()).all()
     return render_template('configuration.html', classes=classes)
+
+@main.route('/classe/add', methods=['GET', 'POST'])
+@login_required
+def add_classe():
+    """Gère l'ajout d'une nouvelle classe via un formulaire dédié."""
+    if request.method == 'POST':
+        annee = request.form.get('annee_scolaire')
+        nom_classe = request.form.get('nom_classe')
+        matieres = request.form.get('matieres')
+        eleves = request.form.get('eleves')
+        
+        if all([annee, nom_classe, matieres, eleves]):
+            new_classe = Classe(annee_scolaire=annee, nom_classe=nom_classe, matieres=matieres, eleves=eleves)
+            db.session.add(new_classe)
+            db.session.commit()
+            flash("Nouvelle classe ajoutée avec succès !", "success")
+            return redirect(url_for('main.configuration'))
+        else:
+            flash("Tous les champs sont requis.", "danger")
+            
+    return render_template('classe_form.html', classe=None)
+
+@main.route('/classe/edit/<int:classe_id>', methods=['GET', 'POST'])
+@login_required
+def edit_classe(classe_id):
+    """Gère la modification d'une classe existante."""
+    classe = Classe.query.get_or_404(classe_id)
+    if request.method == 'POST':
+        # On met à jour uniquement les champs modifiables
+        classe.matieres = request.form.get('matieres')
+        classe.eleves = request.form.get('eleves')
+        db.session.commit()
+        flash(f"La classe '{classe.nom_classe}' a été mise à jour avec succès.", "success")
+        return redirect(url_for('main.configuration'))
+        
+    return render_template('classe_form.html', classe=classe)
 
 @main.route('/classe/supprimer/<int:classe_id>', methods=['POST'])
 @login_required

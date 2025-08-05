@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{% if classe %}Modifier la Classe{% else %}Ajouter une Classe{% endif %}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header p-4">
+                <h2>
+                    {% if classe %}
+                        <i class="fas fa-edit me-2"></i>Modifier la Classe : {{ classe.nom_classe }}
+                    {% else %}
+                        <i class="fas fa-plus-circle me-2"></i>Ajouter une nouvelle Classe
+                    {% endif %}
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <!-- Le 'action' du formulaire est dynamique : il pointe soit vers la route d'ajout, soit vers la route de modification -->
+                <form method="POST" action="{% if classe %}{{ url_for('main.edit_classe', classe_id=classe.id) }}{% else %}{{ url_for('main.add_classe') }}{% endif %}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="annee_scolaire" class="form-label">Année Scolaire</label>
+                            <!-- Le champ est pré-rempli et en lecture seule en mode édition -->
+                            <input type="text" class="form-control" id="annee_scolaire" name="annee_scolaire" value="{{ classe.annee_scolaire if classe else '' }}" required {% if classe %}readonly{% endif %}>
+                            {% if classe %}<div class="form-text">L'année scolaire ne peut pas être modifiée.</div>{% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="nom_classe" class="form-label">Nom de la Classe</label>
+                            <!-- Le champ est pré-rempli et en lecture seule en mode édition -->
+                            <input type="text" class="form-control" id="nom_classe" name="nom_classe" value="{{ classe.nom_classe if classe else '' }}" required {% if classe %}readonly{% endif %}>
+                            {% if classe %}<div class="form-text">Le nom de la classe ne peut pas être modifié.</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="matieres" class="form-label">Liste des matières (séparées par une virgule)</label>
+                        <textarea class="form-control" id="matieres" name="matieres" rows="6" required>{{ classe.matieres if classe else '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="eleves" class="form-label">Liste des élèves (NOM Prénom, un par ligne)</label>
+                        <textarea class="form-control" id="eleves" name="eleves" rows="10" required>{{ classe.eleves if classe else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('main.configuration') }}" class="btn btn-secondary me-2">Annuler</a>
+                        <button type="submit" class="btn btn-primary">
+                            {% if classe %}
+                                <i class="fas fa-save me-2"></i>Mettre à jour
+                            {% else %}
+                                <i class="fas fa-plus me-2"></i>Enregistrer la classe
+                            {% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
