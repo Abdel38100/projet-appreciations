@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Nouveau mot de passe{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body p-4">
+                <h2 class="card-title text-center mb-4">Définir un nouveau mot de passe</h2>
+                <form method="POST" action="{{ url_for('main.reset_password', token=token) }}">
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Nouveau mot de passe</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">Confirmer le nouveau mot de passe</label>
+                        <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Réinitialiser</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

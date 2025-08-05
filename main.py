@@ -13,6 +13,8 @@ from parser import analyser_texte_bulletin
 from models import db, Classe, Analyse, User, Prompt, AIProvider
 from flask import Response
 from weasyprint import HTML
+from app import mail
+from flask_mail import Message
 
 main = Blueprint('main', __name__)
 
@@ -43,15 +45,17 @@ def get_ai_response(provider, system_prompt, user_prompt):
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated: return redirect(url_for('main.accueil'))
+    if current_user.is_authenticated: 
+        return redirect(url_for('main.accueil'))
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        if username == os.getenv('APP_USERNAME') and password == os.getenv('APP_PASSWORD'):
-            user = User(id=1)
+        user = User.query.filter_by(username=username).first()
+        if user and user.check_password(password):
             login_user(user)
             return redirect(url_for('main.accueil'))
-        else: flash('Échec de la connexion.', 'danger')
+        else: 
+            flash('Échec de la connexion. Vérifiez le nom d\'utilisateur et le mot de passe.', 'danger')
     return render_template('login.html')
 
 @main.route('/logout')
@@ -481,3 +485,73 @@ def edit_analyse(analyse_id):
 
     return redirect(url_for('main.historique_classe', classe_id=analyse.classe_id))
 
+
+
+def send_reset_email(user):
+    token = user.get_reset_token()
+    msg = Message('Demande de réinitialisation de mot de passe',
+                  sender=current_app.config['MAIL_USERNAME'],
+                  recipients=[user.email])
+    msg.body = f'''Pour réinitialiser votre mot de passe, visitez le lien suivant :
+{url_for('main.reset_password', token=token, _external=True)}
+
+Si vous n'êtes pas à l'origine de cette demande, veuillez ignorer cet e-mail.
+'''
+    mail.send(msg)
+
+@main.route("/account", methods=['GET', 'POST'])
+@login_required
+def account():
+    if request.method == 'POST':
+        current_user.username = request.form['username']
+        current_user.email = request.form['email']
+        
+        password = request.form.get('password')
+        password_confirm = request.form.get('password_confirm')
+        
+        if password:
+            if password == password_confirm:
+                current_user.set_password(password)
+                flash('Votre mot de passe a été mis à jour !', 'success')
+            else:
+                flash('Les mots de passe ne correspondent pas.', 'danger')
+                return render_template('account.html')
+        
+        db.session.commit()
+        flash('Votre compte a été mis à jour !', 'success')
+        return redirect(url_for('main.account'))
+    
+    return render_template('account.html')
+
+@main.route("/reset_password", methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.accueil'))
+    if request.method == 'POST':
+        user = User.query.filter_by(email=request.form['email']).first()
+        if user:
+            send_reset_email(user)
+        flash('Si un compte avec cet e-mail existe, un lien de réinitialisation a été envoyé.', 'info')
+        return redirect(url_for('main.login'))
+    return render_template('reset_request.html')
+
+@main.route("/reset_password/<token>", methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('main.accueil'))
+    user = User.verify_reset_token(token)
+    if user is None:
+        flash('Le jeton de réinitialisation est invalide ou a expiré.', 'warning')
+        return redirect(url_for('main.reset_password_request'))
+    
+    if request.method == 'POST':
+        password = request.form.get('password')
+        password_confirm = request.form.get('password_confirm')
+        if password == password_confirm:
+            user.set_password(password)
+            db.session.commit()
+            flash('Votre mot de passe a été mis à jour ! Vous pouvez vous connecter.', 'success')
+            return redirect(url_for('main.login'))
+        else:
+            flash('Les mots de passe ne correspondent pas.', 'danger')
+    return render_template('reset_token.html', token=token)
