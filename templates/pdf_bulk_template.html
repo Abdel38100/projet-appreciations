@@ -4,60 +4,78 @@
     <meta charset="utf-8">
     <title>Appréciations {{ classe.nom_classe }} - T{{ trimestre }}</title>
     <style>
+        /* --- OPTIMISATIONS DE LA PAGE --- */
+        @page {
+            /* Réduction drastique des marges de la page */
+            margin-top: 1.5cm;
+            margin-bottom: 1.5cm;
+            margin-left: 1cm;
+            margin-right: 1cm;
+        }
+
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap');
 
         body {
             font-family: 'Roboto', sans-serif;
-            font-size: 11pt;
-            line-height: 1.5;
+            font-size: 10pt; /* Police de base réduite */
+            line-height: 1.4;
             color: #333;
         }
         .student-page {
-            page-break-after: always; /* Force un saut de page après chaque élève */
-            width: 90%;
+            page-break-after: always;
+            width: 100%; /* Utilise toute la largeur disponible après marges */
             margin: 0 auto;
         }
         .student-page:last-child {
-            page-break-after: auto; /* Empêche le saut de page après le dernier élève */
+            page-break-after: auto;
         }
         h1 {
             font-family: 'Merriweather', serif;
+            font-size: 16pt; /* Taille du titre principal réduite */
             color: #1e293b;
             text-align: center;
             border-bottom: 2px solid #3b82f6;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
+            padding-bottom: 8px; /* Espacement réduit */
+            margin-bottom: 20px; /* Espacement réduit */
         }
         .info-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            margin-bottom: 20px; /* Espacement réduit */
         }
         .info-table td {
-            padding: 8px;
+            padding: 5px 8px; /* Espacement interne réduit */
             border: 1px solid #e2e8f0;
         }
         .info-table .label {
             font-weight: bold;
             background-color: #f1f5f9;
-            width: 25%;
+            width: 20%; /* Largeur de la colonne label réduite */
         }
         .section-title {
             font-family: 'Merriweather', serif;
-            font-size: 14pt;
+            font-size: 12pt; /* Taille des titres de section réduite */
             color: #3b82f6;
             border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 5px;
-            margin-top: 30px;
-            margin-bottom: 15px;
+            padding-bottom: 4px; /* Espacement réduit */
+            margin-top: 20px; /* Espacement réduit */
+            margin-bottom: 10px; /* Espacement réduit */
         }
         .content {
             background-color: #f8fafc;
-            border-left: 4px solid #3b82f6;
-            padding: 15px;
+            border-left: 3px solid #3b82f6;
+            padding: 10px; /* Espacement interne réduit */
             white-space: pre-wrap;
             font-family: 'Merriweather', serif;
+        }
+        
+        /* --- NOUVEAU : Style pour les justifications --- */
+        .justifications {
+            font-size: 9pt; /* Police encore plus petite pour les détails */
+            color: #475569;
+            font-family: 'Roboto', sans-serif; /* Police plus neutre pour les justifications */
+            white-space: normal; /* Permet au texte de s'écouler normalement */
         }
     </style>
 </head>
@@ -85,6 +103,16 @@
         <div class="content">
             {{ analyse.appreciation_principale }}
         </div>
+
+        <!-- NOUVEAU : Ajout de la section Justifications -->
+        {% if analyse.justifications %}
+        <div class="section-title">Justifications</div>
+        <div class="content justifications">
+            <!-- On nettoie les caractères Markdown pour une meilleure lisibilité sur le PDF -->
+            {{ analyse.justifications | replace('**', '') | replace('*', '') }}
+        </div>
+        {% endif %}
+
     </div>
     {% endfor %}
 </body>
